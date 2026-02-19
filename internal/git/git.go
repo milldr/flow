@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -50,7 +51,11 @@ func (r *RealRunner) run(ctx context.Context, args ...string) error {
 // BareClone creates a bare clone of a repository.
 func (r *RealRunner) BareClone(ctx context.Context, url, dest string) error {
 	r.log().Debug("bare cloning repository", "url", url, "dest", dest)
-	return r.run(ctx, "clone", "--bare", "https://"+url, dest)
+	cloneURL := url
+	if !strings.Contains(url, "://") && !strings.HasPrefix(url, "git@") && !filepath.IsAbs(url) && !strings.HasPrefix(url, ".") {
+		cloneURL = "https://" + url
+	}
+	return r.run(ctx, "clone", "--bare", cloneURL, dest)
 }
 
 // Fetch fetches all refs in a bare repository.

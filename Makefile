@@ -3,7 +3,7 @@ MODULE := github.com/milldr/flow
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS := -ldflags "-s -w -X $(MODULE)/internal/cmd.version=$(VERSION)"
 
-.PHONY: build install test lint clean snapshot
+.PHONY: build install test lint clean snapshot demo
 
 build:
 	go build $(LDFLAGS) -o $(BINARY) ./cmd/flow
@@ -23,3 +23,6 @@ clean:
 
 snapshot:
 	goreleaser release --snapshot --clean
+
+demo: build
+	vhs demo.tape
