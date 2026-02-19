@@ -5,7 +5,7 @@ Set Shell "bash"
 Set FontFamily "Menlo"
 Set FontSize 16
 Set Width 900
-Set Height 450
+Set Height 500
 Set Padding 20
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 60ms
@@ -24,31 +24,63 @@ Type `export PATH="$(pwd):$PATH"`
 Enter
 Sleep 200ms
 
+Type `export EDITOR="vim -u NONE"`
+Enter
+Sleep 200ms
+
 Type "clear"
 Enter
 Sleep 500ms
 
 Show
 
-# === flow list ===
+# === flow init ===
 
 Sleep 500ms
 
-Type "flow list"
+Type "flow init --name demo"
 Sleep 500ms
 Enter
 Sleep 2s
 
-# === flow render (by name) ===
+# === flow state (add a repo in vim) ===
 
-Type "flow render vpc-ipv6"
+Type "flow state demo"
+Sleep 500ms
+Enter
+Sleep 1500ms
+
+# Vim opens state.yaml. Last line is "    repos: []"
+# G=last line, $=end of line, F[=back to [, C=change to EOL (deletes [])
+Type@0ms "G$F[C"
+Sleep 500ms
+
+# Now in insert mode after "    repos: " — type the repo entry
+Enter
+Type@30ms "        - url: /tmp/demo/app"
+Enter
+Type@30ms "          branch: feature/ipv6"
+Enter
+Type@30ms "          path: app"
+Sleep 500ms
+
+# Exit insert mode, save and quit
+Escape
+Sleep 300ms
+Type ":wq"
+Enter
+Sleep 1500ms
+
+# === flow render ===
+
+Type "flow render demo"
 Sleep 500ms
 Enter
 Sleep 4s
 
-# === flow exec (by name) ===
+# === flow exec ===
 
-Type "flow exec vpc-ipv6 -- ls"
+Type "flow exec demo -- ls"
 Sleep 500ms
 Enter
 Sleep 3s
