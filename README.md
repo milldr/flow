@@ -32,12 +32,9 @@ flow init
 ```
 
 ```
-✅ Created workspace: calm-delta
-   Location: ~/.flow/workspaces/calm-delta/
+✓ Created workspace calm-delta
 
-Next steps:
-  flow state calm-delta     # Add repos to state file
-  flow render calm-delta    # Create worktrees
+  Next: flow state calm-delta
 ```
 
 ### 3. Add repos
@@ -53,16 +50,11 @@ flow render calm-delta
 ```
 
 ```
-📦 Rendering workspace: calm-delta
+✓ Workspace ready
 
-  [1/2] github.com/acme/vpc-service
-        └── Worktree: ./vpc-service (feature/ipv6) ✓
-  [2/2] github.com/acme/subnet-manager
-        └── Worktree: ./subnet-manager (feature/ipv6) ✓
-
-✅ Workspace ready
-
-  flow exec calm-delta -- cursor .   # Open in editor
+  flow exec calm-delta -- <command>
+  flow exec calm-delta -- cursor .
+  flow exec calm-delta -- claude
 ```
 
 Flow fetches each repo into a bare clone cache (`~/.flow/repos/`), then creates lightweight worktrees in the workspace directory. Running `render` again is idempotent — it fetches updates and skips worktrees that already exist.
@@ -87,9 +79,9 @@ flow list
 ```
 
 ```
-NAME        DESCRIPTION                       REPOS   CREATED
-vpc-ipv6    IPv6 support across VPC services   3      2h ago
-auth-v2     Auth service rewrite               2      5d ago
+ID             NAME       DESCRIPTION                        REPOS  CREATED
+calm-delta     vpc-ipv6   IPv6 support across VPC services   3      2h ago
+bold-creek     auth-v2    Auth service rewrite               2      5d ago
 ```
 
 **Aliases:** `flow ls`
