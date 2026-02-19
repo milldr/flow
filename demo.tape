@@ -38,7 +38,7 @@ Show
 
 Sleep 500ms
 
-Type "flow init --name demo"
+Type "flow init demo"
 Sleep 500ms
 Enter
 Sleep 3s
