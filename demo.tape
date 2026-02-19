@@ -62,7 +62,7 @@ Enter
 Type@30ms "          branch: feature/ipv6"
 Enter
 Type@30ms "          path: app"
-Sleep 500ms
+Sleep 3s
 
 # Exit insert mode, save and quit
 Escape
@@ -85,4 +85,4 @@ Sleep 500ms
 Enter
 Sleep 3s
 
-Sleep 5s
+Sleep 8s
