@@ -27,7 +27,8 @@ func newStateCmd(svc *workspace.Service) *cobra.Command {
 				editor = "vim"
 			}
 
-			c := exec.Command(editor, statePath)
+			// Use shell to handle EDITOR values with arguments (e.g. "code --wait")
+			c := exec.Command("sh", "-c", editor+` "$1"`, "--", statePath)
 			c.Stdin = os.Stdin
 			c.Stdout = os.Stdout
 			c.Stderr = os.Stderr
