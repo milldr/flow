@@ -63,13 +63,15 @@ Flow fetches each repo into a bare clone cache (`~/.flow/repos/`), then creates 
 
 ## Commands
 
+Every workspace has a generated **ID** (e.g. `calm-delta`) and an optional **name** (e.g. `vpc-ipv6`). All commands that take a `<workspace>` argument accept either the ID or the name. If a name matches multiple workspaces, an interactive selector is shown.
+
 ### `flow init [name]`
 
-Create a new empty workspace. If no name is given, one is generated automatically (e.g. `calm-delta`, `bold-creek`).
+Create a new empty workspace. A unique ID is always generated. If a name is provided, it's associated with the workspace.
 
 ```bash
-flow init              # generated name
-flow init vpc-ipv6     # explicit name
+flow init              # ID only (e.g. calm-delta)
+flow init vpc-ipv6     # ID + name
 ```
 
 ### `flow list`
@@ -88,22 +90,24 @@ bold-creek     auth-v2    Auth service rewrite               2      5d ago
 
 **Aliases:** `flow ls`
 
-### `flow render <name>`
+### `flow render <workspace>`
 
 Materialize the workspace. Clones repos (or fetches if cached), creates worktrees for each repo/branch pair.
 
 ```bash
-flow render vpc-ipv6
+flow render vpc-ipv6       # by name
+flow render calm-delta     # by ID
 ```
 
 Idempotent — safe to run repeatedly. Existing worktrees are skipped, cached repos are fetched.
 
-### `flow state <name>`
+### `flow state <workspace>`
 
 Open the workspace state file in your editor (`$EDITOR` or `vim`).
 
 ```bash
-flow state vpc-ipv6
+flow state vpc-ipv6        # by name
+flow state calm-delta      # by ID
 ```
 
 The state file is YAML:
@@ -125,22 +129,23 @@ spec:
       path: subnet-manager
 ```
 
-### `flow exec <name> -- <command>`
+### `flow exec <workspace> -- <command>`
 
 Run a command from the workspace directory.
 
 ```bash
-flow exec vpc-ipv6 -- cursor .
-flow exec vpc-ipv6 -- git status
+flow exec vpc-ipv6 -- cursor .       # by name
+flow exec calm-delta -- git status    # by ID
 flow exec vpc-ipv6 -- ls -la
 ```
 
-### `flow delete <name>`
+### `flow delete <workspace>`
 
 Delete a workspace and its worktrees. Prompts for confirmation unless `--force` is passed.
 
 ```bash
-flow delete vpc-ipv6
+flow delete vpc-ipv6       # by name
+flow delete calm-delta     # by ID
 ```
 
 **Options:**
@@ -162,13 +167,13 @@ Flow stores everything under `~/.flow` (override with `$FLOW_HOME`):
 ```
 ~/.flow/
 ├── workspaces/
-│   └── vpc-ipv6/
-│       ├── state.yaml          # Workspace manifest
-│       ├── vpc-service/        # Worktree
-│       └── subnet-manager/     # Worktree
+│   └── calm-delta/                     # Workspace ID
+│       ├── state.yaml                  # Workspace manifest (name: vpc-ipv6)
+│       ├── vpc-service/                # Worktree
+│       └── subnet-manager/             # Worktree
 └── cache/
-    ├── acme-vpc-service.git/       # Bare clone
-    └── acme-subnet-manager.git/    # Bare clone
+    ├── acme-vpc-service.git/           # Bare clone
+    └── acme-subnet-manager.git/        # Bare clone
 ```
 
 Bare clones are shared across workspaces. Worktrees are cheap — they share the object store with the bare clone, so multiple workspaces pointing at the same repo don't duplicate data.
