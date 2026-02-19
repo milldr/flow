@@ -9,7 +9,7 @@ Set Height 500
 Set Padding 20
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 60ms
-Set PlaybackSpeed 2
+Set PlaybackSpeed 1
 Set LetterSpacing 0
 Set LineHeight 1.2
 
