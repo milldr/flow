@@ -2,13 +2,13 @@
 Output demo.gif
 
 Set Shell "bash"
-Set Theme "Catppuccin Mocha"
-Set FontFamily "JetBrains Mono"
-Set FontSize 14
-Set Width 1000
-Set Height 550
+Set FontSize 16
+Set Width 800
+Set Height 400
 Set Padding 20
-Set TypingSpeed 40ms
+Set Theme "Catppuccin Mocha"
+Set TypingSpeed 60ms
+Set PlaybackSpeed 2
 
 # --- Hidden setup ---
 Hide
@@ -33,16 +33,16 @@ Show
 
 # === flow init ===
 
-Sleep 300ms
+Sleep 500ms
 
 Type "flow init"
-Sleep 400ms
+Sleep 500ms
 Enter
 Sleep 1500ms
 
 # Form: "What are you working on?"
 Type "VPC IPv6"
-Sleep 400ms
+Sleep 500ms
 Enter
 Sleep 1500ms
 
@@ -82,22 +82,22 @@ Sleep 2500ms
 # === flow list ===
 
 Type "flow list"
-Sleep 400ms
+Sleep 500ms
 Enter
 Sleep 2s
 
 # === flow render ===
 
 Type "flow render vpc-ipv6"
-Sleep 400ms
+Sleep 500ms
 Enter
 Sleep 4s
 
 # === flow exec ===
 
 Type "flow exec vpc-ipv6 -- ls"
-Sleep 400ms
+Sleep 500ms
 Enter
 Sleep 3s
 
-Sleep 2s
+Sleep 5s
