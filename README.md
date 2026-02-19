@@ -1,5 +1,8 @@
 # :ocean: flow
 
+> [!WARNING]
+> This project is still in draft and under active development. APIs and commands may change.
+
 CLI for managing multi-repo development workspaces using git worktrees.
 
 Working across multiple repos means repetitive setup, scattered branches, and cleanup debt. Flow uses a YAML state file to define which repos and branches belong together, then materializes the workspace with bare clone caching and git worktrees.

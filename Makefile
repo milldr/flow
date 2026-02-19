@@ -25,4 +25,5 @@ snapshot:
 	goreleaser release --snapshot --clean
 
 demo: build
+	bash demo-setup.sh
 	vhs demo.tape

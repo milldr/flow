@@ -2,6 +2,7 @@
 Output demo.gif
 
 Set Shell "bash"
+Set FontFamily "Menlo"
 Set FontSize 16
 Set Width 800
 Set Height 400
@@ -9,13 +10,11 @@ Set Padding 20
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 60ms
 Set PlaybackSpeed 2
+Set LetterSpacing 0
+Set LineHeight 1.2
 
-# --- Hidden setup ---
+# --- Hidden env setup (demo-setup.sh runs before vhs via Makefile) ---
 Hide
-
-Type `bash demo-setup.sh`
-Enter
-Sleep 2s
 
 Type `export FLOW_HOME=/tmp/flow-demo/.flow`
 Enter
