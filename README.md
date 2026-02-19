@@ -1,7 +1,9 @@
 # :ocean: flow
 
-> [!WARNING]
-> This project is still in draft and under active development. APIs and commands may change.
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/milldr)
+
+> [!IMPORTANT]
+> This project is pre-release. APIs and commands may change.
 
 CLI for managing multi-repo development workspaces using git worktrees.
 
@@ -194,6 +196,12 @@ make lint
 # Build release snapshot
 make snapshot
 ```
+
+## Support
+
+I build and maintain projects like flow in my free time as personal hobbies. They're completely free and always will be. If you find this useful and want to show some support, feel free to buy me a coffee:
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/milldr)
 
 ## License
 
