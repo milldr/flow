@@ -47,3 +47,12 @@ func resolveWorkspace(svc *workspace.Service, idOrName string) (string, *state.S
 	}
 	return id, st, nil
 }
+
+// workspaceDisplayName returns the name for user-facing output.
+// Prefers metadata name if set, otherwise falls back to the ID.
+func workspaceDisplayName(id string, st *state.State) string {
+	if st.Metadata.Name != "" {
+		return st.Metadata.Name
+	}
+	return id
+}

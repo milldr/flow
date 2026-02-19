@@ -22,13 +22,15 @@ func newDeleteCmd(svc *workspace.Service) *cobra.Command {
 				return err
 			}
 
+			name := workspaceDisplayName(id, st)
+
 			if !force {
 				var repoPaths []string
 				for _, r := range st.Spec.Repos {
 					repoPaths = append(repoPaths, r.Path)
 				}
 
-				confirmed, err := ui.ConfirmDelete(id, repoPaths)
+				confirmed, err := ui.ConfirmDelete(name, repoPaths)
 				if err != nil {
 					return err
 				}
@@ -42,7 +44,7 @@ func newDeleteCmd(svc *workspace.Service) *cobra.Command {
 				return err
 			}
 
-			ui.Success("Deleted workspace: " + id)
+			ui.Success("Deleted workspace: " + name)
 			return nil
 		},
 	}

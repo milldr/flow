@@ -13,12 +13,12 @@ func newRenderCmd(svc *workspace.Service) *cobra.Command {
 		Args:    cobra.ExactArgs(1),
 		Example: `  flow render calm-delta`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			id, _, err := resolveWorkspace(svc, args[0])
+			id, st, err := resolveWorkspace(svc, args[0])
 			if err != nil {
 				return err
 			}
 
-			ui.Info("Rendering workspace: " + id)
+			ui.Info("Rendering workspace: " + workspaceDisplayName(id, st))
 			ui.Print("")
 
 			err = svc.Render(cmd.Context(), id, func(msg string) {
@@ -31,7 +31,8 @@ func newRenderCmd(svc *workspace.Service) *cobra.Command {
 			ui.Print("")
 			ui.Success("Workspace ready")
 			ui.Print("")
-			ui.Printf("  flow exec %s -- cursor .   # Open in editor\n", id)
+			name := workspaceDisplayName(id, st)
+			ui.Printf("  flow exec %s -- cursor .   # Open in editor\n", name)
 
 			return nil
 		},
