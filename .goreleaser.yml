@@ -1,0 +1,30 @@
+version: 2
+
+builds:
+  - main: ./cmd/flow
+    binary: flow
+    ldflags:
+      - -s -w -X github.com/milldr/flow/internal/cmd.version={{.Version}}
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+universal_binaries:
+  - replace: true
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"

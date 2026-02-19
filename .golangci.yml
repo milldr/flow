@@ -1,0 +1,45 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gocritic
+    - revive
+    - misspell
+    - errorlint
+    - sloglint
+    - forbidigo
+    - err113
+
+  settings:
+    sloglint:
+      # Enforce structured key-value pairs, no interpolated messages.
+      no-global: ""
+
+    forbidigo:
+      forbid:
+        # Ban direct stdout writes in library packages.
+        # User output goes through internal/ui; debug goes through slog.
+        - pattern: '^fmt\.Print(|f|ln)$'
+          msg: "use the ui package for user output or slog for debug logging"
+
+  exclusions:
+    rules:
+      # Allow fmt.Print* in ui and cmd packages (they produce user output).
+      - linters: [forbidigo]
+        path: 'internal/ui/'
+      - linters: [forbidigo]
+        path: 'internal/cmd/'
+      - linters: [forbidigo]
+        path: 'cmd/'
+      # Allow dynamic errors in test files.
+      - linters: [err113]
+        path: '_test\.go$'
+
+formatters:
+  enable:
+    - gofmt
