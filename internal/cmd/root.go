@@ -28,11 +28,12 @@ func newLogger() *slog.Logger {
 
 func newRootCmd() *cobra.Command {
 	root := &cobra.Command{
-		Use:           "flow",
-		Short:         "Multi-repo workspace manager using git worktrees",
-		Long:          "Flow manages multi-repo development workspaces using git worktrees.\nA YAML manifest defines which repos/branches belong together, and `flow render` materializes the workspace.",
-		SilenceUsage:  true,
-		SilenceErrors: true,
+		Use:               "flow",
+		Short:             "Multi-repo workspace manager using git worktrees",
+		Long:              "Flow manages multi-repo development workspaces using git worktrees.\nA YAML manifest defines which repos/branches belong together, and `flow render` materializes the workspace.",
+		SilenceUsage:      true,
+		SilenceErrors:     true,
+		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
 	}
 
 	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose debug output")

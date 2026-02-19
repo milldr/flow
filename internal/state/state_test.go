@@ -90,14 +90,14 @@ func TestValidate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "missing name",
+			name: "empty name is valid",
 			state: &State{
 				APIVersion: "flow/v1",
 				Kind:       "State",
 				Metadata:   Metadata{},
 				Spec:       Spec{Repos: []Repo{{URL: "u", Branch: "b", Path: "p"}}},
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "no repos",

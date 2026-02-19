@@ -31,52 +31,51 @@ make install
 flow init
 ```
 
-You'll be prompted for a name, description, and repos:
-
 ```
-? Workspace name
-> vpc-ipv6
+✅ Created workspace: calm-delta
+   Location: ~/.flow/workspaces/calm-delta/
 
-? Description (optional)
-> IPv6 support across VPC services
-
-? Repository URL
-> git@github.com:acme/vpc-service.git
-
-? Branch
-> feature/ipv6
-
-? Local path
-> vpc-service
+Next steps:
+  flow state calm-delta     # Add repos to state file
+  flow render calm-delta    # Create worktrees
 ```
 
-### 3. Render it
+### 3. Add repos
 
 ```bash
-flow render vpc-ipv6
+flow state calm-delta     # Open state.yaml in $EDITOR
+```
+
+### 4. Render it
+
+```bash
+flow render calm-delta
 ```
 
 ```
-ℹ Rendering workspace: vpc-ipv6
+📦 Rendering workspace: calm-delta
 
-  Cloning git@github.com:acme/vpc-service.git
-  Creating worktree: vpc-service @ feature/ipv6
+  [1/2] github.com/acme/vpc-service
+        └── Worktree: ./vpc-service (feature/ipv6) ✓
+  [2/2] github.com/acme/subnet-manager
+        └── Worktree: ./subnet-manager (feature/ipv6) ✓
 
-✓ Workspace ready
+✅ Workspace ready
 
-  flow exec vpc-ipv6 -- cursor .   # Open in editor
+  flow exec calm-delta -- cursor .   # Open in editor
 ```
 
-Flow fetches each repo into a bare clone cache (`~/.flow/cache/`), then creates lightweight worktrees in the workspace directory. Running `render` again is idempotent — it fetches updates and skips worktrees that already exist.
+Flow fetches each repo into a bare clone cache (`~/.flow/repos/`), then creates lightweight worktrees in the workspace directory. Running `render` again is idempotent — it fetches updates and skips worktrees that already exist.
 
 ## Commands
 
-### `flow init`
+### `flow init [name]`
 
-Create a new workspace interactively. Walks you through naming the workspace and adding repositories.
+Create a new empty workspace. If no name is given, one is generated automatically (e.g. `calm-delta`, `bold-creek`).
 
 ```bash
-flow init
+flow init              # generated name
+flow init vpc-ipv6     # explicit name
 ```
 
 ### `flow list`

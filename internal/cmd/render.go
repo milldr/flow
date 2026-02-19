@@ -8,22 +8,20 @@ import (
 
 func newRenderCmd(svc *workspace.Service) *cobra.Command {
 	return &cobra.Command{
-		Use:     "render <name>",
+		Use:     "render <workspace>",
 		Short:   "Create worktrees from workspace state file",
 		Args:    cobra.ExactArgs(1),
-		Example: `  flow render vpc-ipv6`,
+		Example: `  flow render calm-delta`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			name := args[0]
-
-			// Verify workspace exists before printing header
-			if _, err := svc.Find(name); err != nil {
+			id, _, err := resolveWorkspace(svc, args[0])
+			if err != nil {
 				return err
 			}
 
-			ui.Info("Rendering workspace: " + name)
+			ui.Info("Rendering workspace: " + id)
 			ui.Print("")
 
-			err := svc.Render(cmd.Context(), name, func(msg string) {
+			err = svc.Render(cmd.Context(), id, func(msg string) {
 				ui.Printf("  %s\n", msg)
 			})
 			if err != nil {
@@ -33,7 +31,7 @@ func newRenderCmd(svc *workspace.Service) *cobra.Command {
 			ui.Print("")
 			ui.Success("Workspace ready")
 			ui.Print("")
-			ui.Printf("  flow exec %s -- cursor .   # Open in editor\n", name)
+			ui.Printf("  flow exec %s -- cursor .   # Open in editor\n", id)
 
 			return nil
 		},

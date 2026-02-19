@@ -11,19 +11,17 @@ import (
 
 func newStateCmd(svc *workspace.Service) *cobra.Command {
 	return &cobra.Command{
-		Use:     "state <name>",
+		Use:     "state <workspace>",
 		Short:   "Open workspace state file in editor",
 		Args:    cobra.ExactArgs(1),
-		Example: `  flow state vpc-ipv6    # Opens state.yaml in $EDITOR`,
+		Example: `  flow state calm-delta    # Opens state.yaml in $EDITOR`,
 		RunE: func(_ *cobra.Command, args []string) error {
-			name := args[0]
-
-			// Verify workspace exists
-			if _, err := svc.Find(name); err != nil {
+			id, _, err := resolveWorkspace(svc, args[0])
+			if err != nil {
 				return err
 			}
 
-			statePath := svc.Config.StatePath(name)
+			statePath := svc.Config.StatePath(id)
 			editor := os.Getenv("EDITOR")
 			if editor == "" {
 				editor = "vim"

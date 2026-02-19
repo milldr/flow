@@ -13,7 +13,6 @@ import (
 var (
 	ErrInvalidAPIVersion = errors.New("apiVersion must be flow/v1")
 	ErrInvalidKind       = errors.New("kind must be State")
-	ErrMissingName       = errors.New("metadata.name is required")
 	ErrMissingRepos      = errors.New("spec.repos must not be empty")
 	ErrMissingRepoURL    = errors.New("url is required")
 	ErrMissingRepoBranch = errors.New("branch is required")
@@ -52,9 +51,6 @@ func Validate(s *State) error {
 	}
 	if s.Kind != "State" {
 		return ErrInvalidKind
-	}
-	if s.Metadata.Name == "" {
-		return ErrMissingName
 	}
 	if len(s.Spec.Repos) == 0 {
 		return ErrMissingRepos

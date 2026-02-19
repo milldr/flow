@@ -73,12 +73,12 @@ func TestCreateAndList(t *testing.T) {
 		{URL: "github.com/org/repo", Branch: "main", Path: "./repo"},
 	})
 
-	if err := svc.Create(st); err != nil {
+	if err := svc.Create("test-ws", st); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
 
-	// Duplicate should fail
-	if err := svc.Create(st); err == nil {
+	// Duplicate ID should fail
+	if err := svc.Create("test-ws", st); err == nil {
 		t.Fatal("expected error for duplicate workspace")
 	}
 
@@ -89,8 +89,61 @@ func TestCreateAndList(t *testing.T) {
 	if len(infos) != 1 {
 		t.Fatalf("List count = %d, want 1", len(infos))
 	}
+	if infos[0].ID != "test-ws" {
+		t.Errorf("ID = %q, want test-ws", infos[0].ID)
+	}
 	if infos[0].Name != "test-ws" {
 		t.Errorf("Name = %q, want test-ws", infos[0].Name)
+	}
+}
+
+func TestCreateIDDiffersFromName(t *testing.T) {
+	svc, _ := testService(t)
+
+	st := state.NewState("my-project", "A project", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "main", Path: "./repo"},
+	})
+
+	if err := svc.Create("calm-delta", st); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	infos, err := svc.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(infos) != 1 {
+		t.Fatalf("List count = %d, want 1", len(infos))
+	}
+	if infos[0].ID != "calm-delta" {
+		t.Errorf("ID = %q, want calm-delta", infos[0].ID)
+	}
+	if infos[0].Name != "my-project" {
+		t.Errorf("Name = %q, want my-project", infos[0].Name)
+	}
+}
+
+func TestCreateEmptyName(t *testing.T) {
+	svc, _ := testService(t)
+
+	st := state.NewState("", "", nil)
+
+	if err := svc.Create("bold-creek", st); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	infos, err := svc.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(infos) != 1 {
+		t.Fatalf("List count = %d, want 1", len(infos))
+	}
+	if infos[0].ID != "bold-creek" {
+		t.Errorf("ID = %q, want bold-creek", infos[0].ID)
+	}
+	if infos[0].Name != "" {
+		t.Errorf("Name = %q, want empty", infos[0].Name)
 	}
 }
 
@@ -98,12 +151,12 @@ func TestRender(t *testing.T) {
 	svc, mock := testService(t)
 	ctx := context.Background()
 
-	st := state.NewState("render-ws", "Render test", []state.Repo{
+	st := state.NewState("Render test", "Render test", []state.Repo{
 		{URL: "github.com/org/repo-a", Branch: "main", Path: "./repo-a"},
 		{URL: "github.com/org/repo-b", Branch: "feat/x", Path: "./repo-b"},
 	})
 
-	if err := svc.Create(st); err != nil {
+	if err := svc.Create("render-ws", st); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
 
@@ -145,11 +198,11 @@ func TestDelete(t *testing.T) {
 	svc, mock := testService(t)
 	ctx := context.Background()
 
-	st := state.NewState("del-ws", "Delete test", []state.Repo{
+	st := state.NewState("Delete test", "Delete test", []state.Repo{
 		{URL: "github.com/org/repo", Branch: "main", Path: "./repo"},
 	})
 
-	if err := svc.Create(st); err != nil {
+	if err := svc.Create("del-ws", st); err != nil {
 		t.Fatal(err)
 	}
 
@@ -189,7 +242,7 @@ func TestFindSuccess(t *testing.T) {
 	st := state.NewState("found-ws", "Find test", []state.Repo{
 		{URL: "github.com/org/repo", Branch: "main", Path: "./repo"},
 	})
-	if err := svc.Create(st); err != nil {
+	if err := svc.Create("found-ws", st); err != nil {
 		t.Fatal(err)
 	}
 
@@ -255,11 +308,11 @@ func TestListSkipsMalformedState(t *testing.T) {
 func TestListMultipleWorkspaces(t *testing.T) {
 	svc, _ := testService(t)
 
-	for _, name := range []string{"ws-a", "ws-b", "ws-c"} {
-		st := state.NewState(name, "Desc "+name, []state.Repo{
-			{URL: "github.com/org/" + name, Branch: "main", Path: "./" + name},
+	for _, id := range []string{"ws-a", "ws-b", "ws-c"} {
+		st := state.NewState(id, "Desc "+id, []state.Repo{
+			{URL: "github.com/org/" + id, Branch: "main", Path: "./" + id},
 		})
-		if err := svc.Create(st); err != nil {
+		if err := svc.Create(id, st); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -277,10 +330,10 @@ func TestRenderCloneError(t *testing.T) {
 	svc, mock := testService(t)
 	ctx := context.Background()
 
-	st := state.NewState("clone-fail", "Clone fail test", []state.Repo{
+	st := state.NewState("Clone fail test", "Clone fail test", []state.Repo{
 		{URL: "github.com/org/repo", Branch: "main", Path: "./repo"},
 	})
-	if err := svc.Create(st); err != nil {
+	if err := svc.Create("clone-fail", st); err != nil {
 		t.Fatal(err)
 	}
 
@@ -298,10 +351,10 @@ func TestRenderFetchError(t *testing.T) {
 	svc, mock := testService(t)
 	ctx := context.Background()
 
-	st := state.NewState("fetch-fail", "Fetch fail test", []state.Repo{
+	st := state.NewState("Fetch fail test", "Fetch fail test", []state.Repo{
 		{URL: "github.com/org/repo", Branch: "main", Path: "./repo"},
 	})
-	if err := svc.Create(st); err != nil {
+	if err := svc.Create("fetch-fail", st); err != nil {
 		t.Fatal(err)
 	}
 
@@ -322,10 +375,10 @@ func TestRenderAddWorktreeError(t *testing.T) {
 	svc, mock := testService(t)
 	ctx := context.Background()
 
-	st := state.NewState("wt-fail", "Worktree fail test", []state.Repo{
+	st := state.NewState("Worktree fail test", "Worktree fail test", []state.Repo{
 		{URL: "github.com/org/repo", Branch: "nonexistent", Path: "./repo"},
 	})
-	if err := svc.Create(st); err != nil {
+	if err := svc.Create("wt-fail", st); err != nil {
 		t.Fatal(err)
 	}
 
@@ -366,10 +419,10 @@ func TestDeleteWithoutRender(t *testing.T) {
 	svc, mock := testService(t)
 	ctx := context.Background()
 
-	st := state.NewState("no-render", "Not rendered", []state.Repo{
+	st := state.NewState("Not rendered", "Not rendered", []state.Repo{
 		{URL: "github.com/org/repo", Branch: "main", Path: "./repo"},
 	})
-	if err := svc.Create(st); err != nil {
+	if err := svc.Create("no-render", st); err != nil {
 		t.Fatal(err)
 	}
 
@@ -388,12 +441,12 @@ func TestDeleteMultipleRepos(t *testing.T) {
 	svc, mock := testService(t)
 	ctx := context.Background()
 
-	st := state.NewState("multi-del", "Multi repo delete", []state.Repo{
+	st := state.NewState("Multi repo delete", "Multi repo delete", []state.Repo{
 		{URL: "github.com/org/repo-a", Branch: "main", Path: "./repo-a"},
 		{URL: "github.com/org/repo-b", Branch: "main", Path: "./repo-b"},
 		{URL: "github.com/org/repo-c", Branch: "main", Path: "./repo-c"},
 	})
-	if err := svc.Create(st); err != nil {
+	if err := svc.Create("multi-del", st); err != nil {
 		t.Fatal(err)
 	}
 	if err := svc.Render(ctx, "multi-del", noop); err != nil {
@@ -414,15 +467,145 @@ func TestCreateDuplicateError(t *testing.T) {
 		{URL: "github.com/org/repo", Branch: "main", Path: "./repo"},
 	})
 
-	if err := svc.Create(st); err != nil {
+	if err := svc.Create("dup", st); err != nil {
 		t.Fatal(err)
 	}
 
-	err := svc.Create(st)
+	err := svc.Create("dup", st)
 	if err == nil {
 		t.Fatal("expected error")
 	}
 	if !errors.Is(err, ErrWorkspaceExists) {
 		t.Errorf("expected ErrWorkspaceExists, got %v", err)
+	}
+}
+
+func TestResolveByID(t *testing.T) {
+	svc, _ := testService(t)
+	st := state.NewState("my-project", "A project", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "main", Path: "./repo"},
+	})
+	if err := svc.Create("calm-delta", st); err != nil {
+		t.Fatal(err)
+	}
+
+	matches, err := svc.Resolve("calm-delta")
+	if err != nil {
+		t.Fatalf("Resolve by ID: %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("expected 1 match, got %d", len(matches))
+	}
+	if matches[0].ID != "calm-delta" {
+		t.Errorf("ID = %q, want calm-delta", matches[0].ID)
+	}
+	if matches[0].Name != "my-project" {
+		t.Errorf("Name = %q, want my-project", matches[0].Name)
+	}
+}
+
+func TestResolveByName(t *testing.T) {
+	svc, _ := testService(t)
+	st := state.NewState("my-project", "A project", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "main", Path: "./repo"},
+	})
+	if err := svc.Create("calm-delta", st); err != nil {
+		t.Fatal(err)
+	}
+
+	matches, err := svc.Resolve("my-project")
+	if err != nil {
+		t.Fatalf("Resolve by name: %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("expected 1 match, got %d", len(matches))
+	}
+	if matches[0].ID != "calm-delta" {
+		t.Errorf("ID = %q, want calm-delta", matches[0].ID)
+	}
+}
+
+func TestResolveNotFound(t *testing.T) {
+	svc, _ := testService(t)
+
+	_, err := svc.Resolve("nonexistent")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !errors.Is(err, ErrWorkspaceNotFound) {
+		t.Errorf("expected ErrWorkspaceNotFound, got %v", err)
+	}
+}
+
+func TestResolveAmbiguous(t *testing.T) {
+	svc, _ := testService(t)
+
+	// Create two workspaces with the same name but different IDs
+	st1 := state.NewState("vpc-ipv6", "First attempt", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "main", Path: "./repo"},
+	})
+	st2 := state.NewState("vpc-ipv6", "Second attempt", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "main", Path: "./repo"},
+	})
+
+	if err := svc.Create("calm-delta", st1); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Create("bold-creek", st2); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := svc.Resolve("vpc-ipv6")
+	if err == nil {
+		t.Fatal("expected error for ambiguous name")
+	}
+	if !errors.Is(err, ErrAmbiguousName) {
+		t.Errorf("expected ErrAmbiguousName, got %v", err)
+	}
+
+	var ambErr *AmbiguousNameError
+	if !errors.As(err, &ambErr) {
+		t.Fatal("expected *AmbiguousNameError")
+	}
+	if len(ambErr.Matches) != 2 {
+		t.Errorf("expected 2 matches, got %d", len(ambErr.Matches))
+	}
+}
+
+func TestGenerateID(t *testing.T) {
+	id := GenerateID()
+	if id == "" {
+		t.Fatal("GenerateID returned empty string")
+	}
+	// Should be adjective-noun format
+	parts := 0
+	for _, c := range id {
+		if c == '-' {
+			parts++
+		}
+	}
+	if parts < 1 {
+		t.Errorf("expected at least one hyphen in ID %q", id)
+	}
+}
+
+func TestGenerateUniqueIDNoCollision(t *testing.T) {
+	id := GenerateUniqueID(nil)
+	if id == "" {
+		t.Fatal("GenerateUniqueID returned empty string")
+	}
+}
+
+func TestGenerateUniqueIDAvoidsExisting(t *testing.T) {
+	// Generate many IDs and verify uniqueness
+	existing := make([]string, 0, 50)
+	for range 50 {
+		id := GenerateUniqueID(existing)
+		for _, e := range existing {
+			if id == e {
+				t.Fatalf("GenerateUniqueID returned duplicate: %q", id)
+			}
+		}
+		existing = append(existing, id)
 	}
 }

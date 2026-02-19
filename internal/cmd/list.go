@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"text/tabwriter"
-	"time"
 
 	"github.com/milldr/flow/internal/ui"
 	"github.com/milldr/flow/internal/workspace"
@@ -27,47 +26,40 @@ func newListCmd(svc *workspace.Service) *cobra.Command {
 				return nil
 			}
 
-			w := tabwriter.NewWriter(os.Stdout, 0, 4, 3, ' ', 0)
-			_, _ = fmt.Fprintln(w, "NAME\tDESCRIPTION\tREPOS\tCREATED")
+			// Count name occurrences to detect duplicates
+			nameCounts := make(map[string]int)
 			for _, info := range infos {
-				_, _ = fmt.Fprintf(w, "%s\t%s\t%d\t%s\n",
-					info.Name,
-					truncate(info.Description, 40),
+				if info.Name != "" {
+					nameCounts[info.Name]++
+				}
+			}
+
+			// Track per-name index for duplicate labeling
+			nameIndex := make(map[string]int)
+
+			w := tabwriter.NewWriter(os.Stdout, 0, 4, 3, ' ', 0)
+			_, _ = fmt.Fprintln(w, "ID\tNAME\tDESCRIPTION\tREPOS\tCREATED")
+			for _, info := range infos {
+				displayName := info.Name
+				if info.Name != "" && nameCounts[info.Name] > 1 {
+					nameIndex[info.Name]++
+					displayName = fmt.Sprintf("%s (%d)", info.Name, nameIndex[info.Name])
+				}
+
+				desc := ui.Truncate(info.Description, 40)
+				if desc == "" {
+					desc = "-"
+				}
+
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\n",
+					info.ID,
+					displayName,
+					desc,
 					info.RepoCount,
-					relativeTime(info.Created),
+					ui.RelativeTime(info.Created),
 				)
 			}
 			return w.Flush()
 		},
-	}
-}
-
-func truncate(s string, maxLen int) string {
-	if maxLen < 4 {
-		maxLen = 4
-	}
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-3] + "..."
-}
-
-func relativeTime(t time.Time) string {
-	if t.IsZero() {
-		return "unknown"
-	}
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		m := int(d.Minutes())
-		return fmt.Sprintf("%dm ago", m)
-	case d < 24*time.Hour:
-		h := int(d.Hours())
-		return fmt.Sprintf("%dh ago", h)
-	default:
-		days := int(d.Hours() / 24)
-		return fmt.Sprintf("%dd ago", days)
 	}
 }

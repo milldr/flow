@@ -12,8 +12,8 @@ type State struct {
 
 // Metadata contains workspace identification.
 type Metadata struct {
-	Name        string `yaml:"name"`
-	Description string `yaml:"description"`
+	Name        string `yaml:"name,omitempty"`
+	Description string `yaml:"description,omitempty"`
 	Created     string `yaml:"created"`
 }
 

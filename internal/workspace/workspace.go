@@ -19,11 +19,25 @@ import (
 var (
 	ErrWorkspaceNotFound = errors.New("workspace not found")
 	ErrWorkspaceExists   = errors.New("workspace already exists")
+	ErrAmbiguousName     = errors.New("ambiguous workspace name")
 )
+
+// AmbiguousNameError is returned when a name matches multiple workspaces.
+type AmbiguousNameError struct {
+	Name    string
+	Matches []Info
+}
+
+func (e *AmbiguousNameError) Error() string {
+	return fmt.Sprintf("name %q matches %d workspaces", e.Name, len(e.Matches))
+}
+
+func (e *AmbiguousNameError) Unwrap() error { return ErrAmbiguousName }
 
 // Info holds summary data for listing workspaces.
 type Info struct {
-	Name        string
+	ID          string // directory name (unique identifier)
+	Name        string // metadata.name (may be empty or duplicated)
 	Description string
 	RepoCount   int
 	Created     time.Time
@@ -44,19 +58,20 @@ func (s *Service) log() *slog.Logger {
 }
 
 // Create initializes a new workspace directory and writes the state file.
-func (s *Service) Create(st *state.State) error {
-	wsDir := s.Config.WorkspacePath(st.Metadata.Name)
-	s.log().Debug("creating workspace", "name", st.Metadata.Name, "path", wsDir)
+// id is used as the directory name; st.Metadata.Name may differ from id or be empty.
+func (s *Service) Create(id string, st *state.State) error {
+	wsDir := s.Config.WorkspacePath(id)
+	s.log().Debug("creating workspace", "id", id, "path", wsDir)
 
 	if _, err := os.Stat(wsDir); err == nil {
-		return fmt.Errorf("%w: %s", ErrWorkspaceExists, st.Metadata.Name)
+		return fmt.Errorf("%w: %s", ErrWorkspaceExists, id)
 	}
 
 	if err := os.MkdirAll(wsDir, 0o755); err != nil {
 		return err
 	}
 
-	return state.Save(s.Config.StatePath(st.Metadata.Name), st)
+	return state.Save(s.Config.StatePath(id), st)
 }
 
 // List returns info for all workspaces.
@@ -85,6 +100,7 @@ func (s *Service) List() ([]Info, error) {
 
 		created, _ := time.Parse(time.RFC3339, st.Metadata.Created)
 		infos = append(infos, Info{
+			ID:          entry.Name(),
 			Name:        st.Metadata.Name,
 			Description: st.Metadata.Description,
 			RepoCount:   len(st.Spec.Repos),
@@ -96,30 +112,71 @@ func (s *Service) List() ([]Info, error) {
 	return infos, nil
 }
 
-// Find loads a workspace state by name.
-func (s *Service) Find(name string) (*state.State, error) {
-	stPath := s.Config.StatePath(name)
-	s.log().Debug("finding workspace", "name", name, "path", stPath)
+// Find loads a workspace state by ID (directory name).
+func (s *Service) Find(id string) (*state.State, error) {
+	stPath := s.Config.StatePath(id)
+	s.log().Debug("finding workspace", "id", id, "path", stPath)
 
 	st, err := state.Load(stPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("%w: %s", ErrWorkspaceNotFound, name)
+			return nil, fmt.Errorf("%w: %s", ErrWorkspaceNotFound, id)
 		}
 		return nil, err
 	}
 	return st, nil
 }
 
+// Resolve looks up workspaces by ID or name.
+// It first tries an exact ID match, then falls back to scanning names.
+// Returns 0 matches as ErrWorkspaceNotFound, N>1 matches as *AmbiguousNameError.
+func (s *Service) Resolve(idOrName string) ([]Info, error) {
+	// Try direct ID lookup first (O(1) filesystem check)
+	if _, err := s.Find(idOrName); err == nil {
+		// Load full info for the matched workspace
+		stPath := s.Config.StatePath(idOrName)
+		st, _ := state.Load(stPath)
+		created, _ := time.Parse(time.RFC3339, st.Metadata.Created)
+		return []Info{{
+			ID:          idOrName,
+			Name:        st.Metadata.Name,
+			Description: st.Metadata.Description,
+			RepoCount:   len(st.Spec.Repos),
+			Created:     created,
+		}}, nil
+	}
+
+	// Fall back to name scan
+	all, err := s.List()
+	if err != nil {
+		return nil, err
+	}
+
+	var matches []Info
+	for _, info := range all {
+		if info.Name == idOrName {
+			matches = append(matches, info)
+		}
+	}
+
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("%w: %s", ErrWorkspaceNotFound, idOrName)
+	}
+	if len(matches) > 1 {
+		return nil, &AmbiguousNameError{Name: idOrName, Matches: matches}
+	}
+	return matches, nil
+}
+
 // Render materializes a workspace: ensures bare clones and creates worktrees.
 // progress is called with status messages for each repo.
-func (s *Service) Render(ctx context.Context, name string, progress func(msg string)) error {
-	st, err := s.Find(name)
+func (s *Service) Render(ctx context.Context, id string, progress func(msg string)) error {
+	st, err := s.Find(id)
 	if err != nil {
 		return err
 	}
 
-	wsDir := s.Config.WorkspacePath(name)
+	wsDir := s.Config.WorkspacePath(id)
 	total := len(st.Spec.Repos)
 
 	for i, repo := range st.Spec.Repos {
@@ -161,14 +218,14 @@ func (s *Service) Render(ctx context.Context, name string, progress func(msg str
 }
 
 // Delete removes all worktrees and the workspace directory.
-func (s *Service) Delete(ctx context.Context, name string) error {
-	st, err := s.Find(name)
+func (s *Service) Delete(ctx context.Context, id string) error {
+	st, err := s.Find(id)
 	if err != nil {
 		return err
 	}
 
-	wsDir := s.Config.WorkspacePath(name)
-	s.log().Debug("deleting workspace", "name", name, "path", wsDir)
+	wsDir := s.Config.WorkspacePath(id)
+	s.log().Debug("deleting workspace", "id", id, "path", wsDir)
 
 	// Remove worktrees
 	for _, repo := range st.Spec.Repos {

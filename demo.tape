@@ -4,8 +4,8 @@ Output demo.gif
 Set Shell "bash"
 Set FontFamily "Menlo"
 Set FontSize 16
-Set Width 800
-Set Height 400
+Set Width 900
+Set Height 450
 Set Padding 20
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 60ms
@@ -30,69 +30,23 @@ Sleep 500ms
 
 Show
 
-# === flow init ===
-
-Sleep 500ms
-
-Type "flow init"
-Sleep 500ms
-Enter
-Sleep 1500ms
-
-# Form: "What are you working on?"
-Type "VPC IPv6"
-Sleep 500ms
-Enter
-Sleep 1500ms
-
-# Form: "Workspace name" (pre-filled with "vpc-ipv6")
-# Accept the default
-Enter
-Sleep 1500ms
-
-# Form: "Add a repo (blank to finish)" — first repo
-Type "/tmp/flow-demo/repos/vpc-service"
-Sleep 300ms
-Enter
-Sleep 1500ms
-
-# Form: "Branch for /tmp/flow-demo/repos/vpc-service?"
-Type "feature/ipv6"
-Sleep 300ms
-Enter
-Sleep 1500ms
-
-# Form: "Add a repo (blank to finish)" — second repo
-Type "/tmp/flow-demo/repos/subnet-manager"
-Sleep 300ms
-Enter
-Sleep 1500ms
-
-# Form: "Branch for /tmp/flow-demo/repos/subnet-manager?"
-Type "feature/ipv6"
-Sleep 300ms
-Enter
-Sleep 1500ms
-
-# Form: "Add a repo (blank to finish)" — done
-Enter
-Sleep 2500ms
-
 # === flow list ===
+
+Sleep 500ms
 
 Type "flow list"
 Sleep 500ms
 Enter
 Sleep 2s
 
-# === flow render ===
+# === flow render (by name) ===
 
 Type "flow render vpc-ipv6"
 Sleep 500ms
 Enter
 Sleep 4s
 
-# === flow exec ===
+# === flow exec (by name) ===
 
 Type "flow exec vpc-ipv6 -- ls"
 Sleep 500ms

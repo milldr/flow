@@ -14,17 +14,15 @@ var ErrNoCommand = errors.New("no command specified after '--'")
 
 func newExecCmd(svc *workspace.Service) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "exec <name> -- <command>",
+		Use:   "exec <workspace> -- <command>",
 		Short: "Run a command from the workspace directory",
 		Args:  cobra.MinimumNArgs(1),
-		Example: `  flow exec vpc-ipv6 -- cursor .
-  flow exec vpc-ipv6 -- git status
-  flow exec vpc-ipv6 -- ls -la`,
+		Example: `  flow exec calm-delta -- cursor .
+  flow exec calm-delta -- git status
+  flow exec calm-delta -- ls -la`,
 		RunE: func(_ *cobra.Command, args []string) error {
-			name := args[0]
-
-			// Verify workspace exists
-			if _, err := svc.Find(name); err != nil {
+			id, _, err := resolveWorkspace(svc, args[0])
+			if err != nil {
 				return err
 			}
 
@@ -34,7 +32,7 @@ func newExecCmd(svc *workspace.Service) *cobra.Command {
 				return ErrNoCommand
 			}
 
-			wsDir := svc.Config.WorkspacePath(name)
+			wsDir := svc.Config.WorkspacePath(id)
 
 			c := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 			c.Dir = wsDir

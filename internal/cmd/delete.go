@@ -11,15 +11,13 @@ func newDeleteCmd(svc *workspace.Service) *cobra.Command {
 	var force bool
 
 	cmd := &cobra.Command{
-		Use:   "delete <name>",
+		Use:   "delete <workspace>",
 		Short: "Delete a workspace and its worktrees",
 		Args:  cobra.ExactArgs(1),
-		Example: `  flow delete vpc-ipv6
-  flow delete vpc-ipv6 --force`,
+		Example: `  flow delete calm-delta
+  flow delete calm-delta --force`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			name := args[0]
-
-			st, err := svc.Find(name)
+			id, st, err := resolveWorkspace(svc, args[0])
 			if err != nil {
 				return err
 			}
@@ -30,7 +28,7 @@ func newDeleteCmd(svc *workspace.Service) *cobra.Command {
 					repoPaths = append(repoPaths, r.Path)
 				}
 
-				confirmed, err := ui.ConfirmDelete(name, repoPaths)
+				confirmed, err := ui.ConfirmDelete(id, repoPaths)
 				if err != nil {
 					return err
 				}
@@ -40,11 +38,11 @@ func newDeleteCmd(svc *workspace.Service) *cobra.Command {
 				}
 			}
 
-			if err := svc.Delete(cmd.Context(), name); err != nil {
+			if err := svc.Delete(cmd.Context(), id); err != nil {
 				return err
 			}
 
-			ui.Success("Deleted workspace: " + name)
+			ui.Success("Deleted workspace: " + id)
 			return nil
 		},
 	}
