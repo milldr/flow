@@ -41,7 +41,7 @@ Sleep 500ms
 Type "flow init --name demo"
 Sleep 500ms
 Enter
-Sleep 2s
+Sleep 3s
 
 # === flow state (add a repo in vim) ===
 
@@ -76,7 +76,7 @@ Sleep 1500ms
 Type "flow render demo"
 Sleep 500ms
 Enter
-Sleep 4s
+Sleep 5s
 
 # === flow exec ===
 
@@ -85,4 +85,11 @@ Sleep 500ms
 Enter
 Sleep 3s
 
-Sleep 8s
+# === flow list ===
+
+Type "flow list"
+Sleep 500ms
+Enter
+Sleep 4s
+
+Sleep 6s

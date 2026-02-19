@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"text/tabwriter"
 
 	"github.com/milldr/flow/internal/ui"
 	"github.com/milldr/flow/internal/workspace"
@@ -37,8 +35,8 @@ func newListCmd(svc *workspace.Service) *cobra.Command {
 			// Track per-name index for duplicate labeling
 			nameIndex := make(map[string]int)
 
-			w := tabwriter.NewWriter(os.Stdout, 0, 4, 3, ' ', 0)
-			_, _ = fmt.Fprintln(w, "ID\tNAME\tDESCRIPTION\tREPOS\tCREATED")
+			headers := []string{"ID", "NAME", "DESCRIPTION", "REPOS", "CREATED"}
+			var rows [][]string
 			for _, info := range infos {
 				displayName := info.Name
 				if info.Name != "" && nameCounts[info.Name] > 1 {
@@ -51,15 +49,17 @@ func newListCmd(svc *workspace.Service) *cobra.Command {
 					desc = "-"
 				}
 
-				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\n",
+				rows = append(rows, []string{
 					info.ID,
 					displayName,
 					desc,
-					info.RepoCount,
+					fmt.Sprintf("%d", info.RepoCount),
 					ui.RelativeTime(info.Created),
-				)
+				})
 			}
-			return w.Flush()
+
+			fmt.Println(ui.Table(headers, rows))
+			return nil
 		},
 	}
 }

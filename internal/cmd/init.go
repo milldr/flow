@@ -29,20 +29,24 @@ func newInitCmd(svc *workspace.Service) *cobra.Command {
 			id := workspace.GenerateUniqueID(existingIDs)
 			st := state.NewState(nameFlag, "", nil)
 
-			if err := svc.Create(id, st); err != nil {
+			err = ui.RunWithSpinner("Creating workspace", func(_ func(string)) error {
+				return svc.Create(id, st)
+			})
+			if err != nil {
 				return err
 			}
 
-			ui.Print("")
-			ui.Success("Created workspace: " + id)
+			label := id
 			if nameFlag != "" {
-				ui.Printf("   Name: %s\n", nameFlag)
+				label = id + " (" + nameFlag + ")"
 			}
-			ui.Printf("   Location: %s\n", svc.Config.WorkspacePath(id))
 			ui.Print("")
-			ui.Print("Next steps:")
-			ui.Printf("  flow state %s     # Add repos to state file\n", id)
-			ui.Printf("  flow render %s    # Create worktrees\n", id)
+			ui.Success("Created workspace " + label)
+			ref := id
+			if nameFlag != "" {
+				ref = nameFlag
+			}
+			ui.Printf("\n  Next: %s\n", ui.Code("flow state "+ref))
 
 			return nil
 		},

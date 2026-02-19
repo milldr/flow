@@ -3,17 +3,18 @@ package ui
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
 )
 
 var (
-	successPrefix = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Render("✅")
-	warningPrefix = lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠️ ")
-	errorPrefix   = lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Render("❌")
-	infoPrefix    = lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Render("📦")
-	dimStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	successPrefix = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("2")).Render("✓")
+	warningPrefix = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("3")).Render("!")
+	errorPrefix   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("1")).Render("✗")
+	infoPrefix    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("4")).Render("●")
+	codeStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6"))
 )
 
 // Success prints a success message with a green prefix.
@@ -26,9 +27,14 @@ func Warning(msg string) {
 	fmt.Printf("%s %s\n", warningPrefix, msg)
 }
 
-// Error prints an error message with a red prefix.
+// Error prints an error message with a red prefix to stderr.
 func Error(msg string) {
-	fmt.Printf("%s %s\n", errorPrefix, msg)
+	fmt.Fprintf(os.Stderr, "%s %s\n", errorPrefix, msg)
+}
+
+// Errorf prints a formatted error message with a red prefix to stderr.
+func Errorf(format string, a ...any) {
+	fmt.Fprintf(os.Stderr, "%s %s\n", errorPrefix, fmt.Sprintf(format, a...))
 }
 
 // Info prints an info message with a blue prefix.
@@ -36,9 +42,9 @@ func Info(msg string) {
 	fmt.Printf("%s %s\n", infoPrefix, msg)
 }
 
-// Dim returns the message styled in a dim color.
-func Dim(msg string) string {
-	return dimStyle.Render(msg)
+// Code returns the string styled as an inline command (bold cyan).
+func Code(s string) string {
+	return codeStyle.Render(s)
 }
 
 // Print writes a line to stdout.

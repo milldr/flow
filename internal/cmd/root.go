@@ -7,6 +7,7 @@ import (
 
 	"github.com/milldr/flow/internal/config"
 	"github.com/milldr/flow/internal/git"
+	"github.com/milldr/flow/internal/ui"
 	"github.com/milldr/flow/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -42,12 +43,12 @@ func newRootCmd() *cobra.Command {
 	// PersistentPreRunE so that --verbose is parsed first.
 	cfg, err := config.New()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		ui.Errorf("%v", err)
 		os.Exit(1)
 	}
 
 	if err := cfg.EnsureDirs(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating directories: %v\n", err)
+		ui.Errorf("creating directories: %v", err)
 		os.Exit(1)
 	}
 
@@ -91,7 +92,7 @@ func newVersionCmd() *cobra.Command {
 func Execute() error {
 	cmd := newRootCmd()
 	if err := cmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		ui.Errorf("%v", err)
 		return err
 	}
 	return nil

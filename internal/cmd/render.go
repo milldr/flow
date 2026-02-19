@@ -18,11 +18,10 @@ func newRenderCmd(svc *workspace.Service) *cobra.Command {
 				return err
 			}
 
-			ui.Info("Rendering workspace: " + workspaceDisplayName(id, st))
-			ui.Print("")
+			name := workspaceDisplayName(id, st)
 
-			err = svc.Render(cmd.Context(), id, func(msg string) {
-				ui.Printf("  %s\n", msg)
+			err = ui.RunWithSpinner("Rendering workspace: "+name, func(report func(string)) error {
+				return svc.Render(cmd.Context(), id, report)
 			})
 			if err != nil {
 				return err
@@ -31,8 +30,9 @@ func newRenderCmd(svc *workspace.Service) *cobra.Command {
 			ui.Print("")
 			ui.Success("Workspace ready")
 			ui.Print("")
-			name := workspaceDisplayName(id, st)
-			ui.Printf("  flow exec %s -- cursor .   # Open in editor\n", name)
+			ui.Printf("  %s\n", ui.Code("flow exec "+name+" -- <command>"))
+			ui.Printf("  %s\n", ui.Code("flow exec "+name+" -- cursor ."))
+			ui.Printf("  %s\n", ui.Code("flow exec "+name+" -- claude"))
 
 			return nil
 		},

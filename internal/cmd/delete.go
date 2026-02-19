@@ -40,7 +40,10 @@ func newDeleteCmd(svc *workspace.Service) *cobra.Command {
 				}
 			}
 
-			if err := svc.Delete(cmd.Context(), id); err != nil {
+			err = ui.RunWithSpinner("Deleting workspace: "+name, func(_ func(string)) error {
+				return svc.Delete(cmd.Context(), id)
+			})
+			if err != nil {
 				return err
 			}
 
