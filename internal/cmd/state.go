@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/milldr/flow/internal/workspace"
 	"github.com/spf13/cobra"
@@ -27,8 +28,12 @@ func newStateCmd(svc *workspace.Service) *cobra.Command {
 				editor = "vim"
 			}
 
-			// Use shell to handle EDITOR values with arguments (e.g. "code --wait")
-			c := exec.Command("sh", "-c", editor+` "$1"`, "--", statePath)
+			// Split EDITOR to handle values with arguments (e.g. "code --wait")
+			parts := strings.Fields(editor)
+			editorArgs := make([]string, len(parts)-1, len(parts))
+			copy(editorArgs, parts[1:])
+			editorArgs = append(editorArgs, statePath)
+			c := exec.Command(parts[0], editorArgs...)
 			c.Stdin = os.Stdin
 			c.Stdout = os.Stdout
 			c.Stderr = os.Stderr
