@@ -13,6 +13,12 @@ Working across multiple repos means repetitive setup, scattered branches, and cl
 ### 1. Install
 
 ```bash
+brew install milldr/tap/flow
+```
+
+Or with Go:
+
+```bash
 go install github.com/milldr/flow/cmd/flow@latest
 ```
 

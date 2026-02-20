@@ -16,11 +16,22 @@ universal_binaries:
   - replace: true
 
 archives:
-  - format: tar.gz
+  - formats:
+      - tar.gz
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
   name_template: "checksums.txt"
+
+homebrew_casks:
+  - name: flow
+    repository:
+      owner: milldr
+      name: homebrew-tap
+    homepage: https://github.com/milldr/flow
+    description: Multi-repo workspace manager using git worktrees
+    binaries:
+      - flow
 
 changelog:
   sort: asc
