@@ -63,102 +63,11 @@ Flow fetches each repo into a bare clone cache (`~/.flow/repos/`), then creates 
 
 ## Commands
 
-Every workspace has a generated **ID** (e.g. `calm-delta`) and an optional **name** (e.g. `vpc-ipv6`). All commands that take a `<workspace>` argument accept either the ID or the name. If a name matches multiple workspaces, an interactive selector is shown.
+`flow init` | `flow state` | `flow render` | `flow exec` | `flow list` | `flow delete`
 
-### `flow init [name]`
+Every workspace has a generated **ID** (e.g. `calm-delta`) and an optional **name** (e.g. `vpc-ipv6`). All commands accept either.
 
-Create a new empty workspace. A unique ID is always generated. If a name is provided, it's associated with the workspace.
-
-```bash
-flow init              # ID only (e.g. calm-delta)
-flow init vpc-ipv6     # ID + name
-```
-
-### `flow list`
-
-List all workspaces.
-
-```bash
-flow list
-```
-
-```
-ID             NAME       DESCRIPTION                        REPOS  CREATED
-calm-delta     vpc-ipv6   IPv6 support across VPC services   3      2h ago
-bold-creek     auth-v2    Auth service rewrite               2      5d ago
-```
-
-**Aliases:** `flow ls`
-
-### `flow render <workspace>`
-
-Materialize the workspace. Clones repos (or fetches if cached), creates worktrees for each repo/branch pair.
-
-```bash
-flow render vpc-ipv6       # by name
-flow render calm-delta     # by ID
-```
-
-Idempotent — safe to run repeatedly. Existing worktrees are skipped, cached repos are fetched.
-
-### `flow state <workspace>`
-
-Open the workspace state file in your editor (`$EDITOR` or `vim`).
-
-```bash
-flow state vpc-ipv6        # by name
-flow state calm-delta      # by ID
-```
-
-The state file is YAML:
-
-```yaml
-apiVersion: flow/v1
-kind: State
-metadata:
-  name: vpc-ipv6
-  description: IPv6 support across VPC services
-  created: "2026-02-18T12:00:00Z"
-spec:
-  repos:
-    - url: git@github.com:acme/vpc-service.git
-      branch: feature/ipv6
-      path: vpc-service
-    - url: git@github.com:acme/subnet-manager.git
-      branch: feature/ipv6
-      path: subnet-manager
-```
-
-### `flow exec <workspace> -- <command>`
-
-Run a command from the workspace directory.
-
-```bash
-flow exec vpc-ipv6 -- cursor .       # by name
-flow exec calm-delta -- git status    # by ID
-flow exec vpc-ipv6 -- ls -la
-```
-
-### `flow delete <workspace>`
-
-Delete a workspace and its worktrees. Prompts for confirmation unless `--force` is passed.
-
-```bash
-flow delete vpc-ipv6       # by name
-flow delete calm-delta     # by ID
-```
-
-**Options:**
-
-| Flag | Long      | Description              |
-| ---- | --------- | ------------------------ |
-| `-f` | `--force` | Skip confirmation prompt |
-
-### Global options
-
-| Flag | Long        | Description                |
-| ---- | ----------- | -------------------------- |
-| `-v` | `--verbose` | Enable verbose debug output |
+See the full [command reference](docs/commands/) for usage, flags, examples, and GIF demos.
 
 ## How it works
 
