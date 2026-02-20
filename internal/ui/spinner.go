@@ -15,6 +15,14 @@ import (
 // ErrInterrupted is returned when the spinner is cancelled via ctrl+c.
 var ErrInterrupted = errors.New("interrupted")
 
+// plain forces plain text output even in TTY mode (e.g. when verbose logging is active).
+var plain bool
+
+// SetPlain forces all spinner output to use plain text mode.
+func SetPlain(v bool) {
+	plain = v
+}
+
 // SpinnerOp is the function executed while the spinner is displayed.
 // Call report to emit progress lines shown below the spinner.
 type SpinnerOp func(report func(msg string)) error
@@ -79,7 +87,7 @@ func (m spinnerModel) View() string {
 // RunWithSpinner runs op while displaying an animated spinner in TTY mode.
 // In non-TTY mode it falls back to plain text output.
 func RunWithSpinner(title string, op SpinnerOp) error {
-	if !isatty.IsTerminal(os.Stdout.Fd()) {
+	if plain || !isatty.IsTerminal(os.Stdout.Fd()) {
 		return runPlain(title, op)
 	}
 

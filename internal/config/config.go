@@ -4,6 +4,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Config holds resolved paths for Flow's directory structure.
@@ -44,8 +45,9 @@ func (c *Config) StatePath(name string) string {
 
 // BareRepoPath returns the bare clone path for a repo URL.
 // e.g., github.com/org/repo → ~/.flow/repos/github.com/org/repo.git
+// Handles URLs that already end in .git (e.g., git@github.com:org/repo.git).
 func (c *Config) BareRepoPath(repoURL string) string {
-	return filepath.Join(c.ReposDir, repoURL+".git")
+	return filepath.Join(c.ReposDir, strings.TrimSuffix(repoURL, ".git")+".git")
 }
 
 // EnsureDirs creates the top-level directories if they don't exist.

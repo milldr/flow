@@ -2,6 +2,7 @@
 package cmd
 
 import (
+	"github.com/milldr/flow/internal/state"
 	"github.com/milldr/flow/internal/ui"
 	"github.com/milldr/flow/internal/workspace"
 	"github.com/spf13/cobra"
@@ -27,7 +28,7 @@ func newDeleteCmd(svc *workspace.Service) *cobra.Command {
 			if !force {
 				var repoPaths []string
 				for _, r := range st.Spec.Repos {
-					repoPaths = append(repoPaths, r.Path)
+					repoPaths = append(repoPaths, state.RepoPath(r))
 				}
 
 				confirmed, err := ui.ConfirmDelete(name, repoPaths)

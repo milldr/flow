@@ -38,7 +38,10 @@ func newListCmd(svc *workspace.Service) *cobra.Command {
 			headers := []string{"ID", "NAME", "DESCRIPTION", "REPOS", "CREATED"}
 			var rows [][]string
 			for _, info := range infos {
-				displayName := info.Name
+				displayName := "-"
+				if info.Name != "" {
+					displayName = info.Name
+				}
 				if info.Name != "" && nameCounts[info.Name] > 1 {
 					nameIndex[info.Name]++
 					displayName = fmt.Sprintf("%s (%d)", info.Name, nameIndex[info.Name])

@@ -68,6 +68,7 @@ func TestBareRepoPath(t *testing.T) {
 	}{
 		{"github.com/org/repo", "/test/repos/github.com/org/repo.git"},
 		{"gitlab.com/deep/nested/repo", "/test/repos/gitlab.com/deep/nested/repo.git"},
+		{"git@github.com:org/repo.git", "/test/repos/git@github.com:org/repo.git"},
 	}
 
 	for _, tt := range tests {

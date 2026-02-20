@@ -26,7 +26,7 @@ type Spec struct {
 type Repo struct {
 	URL    string `yaml:"url"`
 	Branch string `yaml:"branch"`
-	Path   string `yaml:"path"`
+	Path   string `yaml:"path,omitempty"`
 }
 
 // NewState creates a State with defaults filled in.

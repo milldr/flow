@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -16,7 +18,6 @@ var (
 	ErrMissingRepos      = errors.New("spec.repos must not be empty")
 	ErrMissingRepoURL    = errors.New("url is required")
 	ErrMissingRepoBranch = errors.New("branch is required")
-	ErrMissingRepoPath   = errors.New("path is required")
 )
 
 // Load reads and parses a state file from disk.
@@ -63,10 +64,18 @@ func Validate(s *State) error {
 		if r.Branch == "" {
 			return fmt.Errorf("spec.repos[%d]: %w", i, ErrMissingRepoBranch)
 		}
-		if r.Path == "" {
-			return fmt.Errorf("spec.repos[%d]: %w", i, ErrMissingRepoPath)
-		}
 	}
 
 	return nil
+}
+
+// RepoPath returns the repo's configured path, or derives one from the URL
+// if path is not set. For example, "git@github.com:org/repo-name.git" yields "repo-name".
+func RepoPath(r Repo) string {
+	if r.Path != "" {
+		return r.Path
+	}
+	// Take the last segment of the URL and strip .git suffix
+	base := path.Base(r.URL)
+	return strings.TrimSuffix(base, ".git")
 }

@@ -18,9 +18,10 @@ type mockRunner struct {
 	worktrees []string
 	removed   []string
 
-	cloneErr error
-	fetchErr error
-	addWTErr error
+	cloneErr     error
+	fetchErr     error
+	addWTErr     error
+	branchExists bool
 }
 
 func (m *mockRunner) BareClone(_ context.Context, url, dest string) error {
@@ -44,9 +45,25 @@ func (m *mockRunner) AddWorktree(_ context.Context, _, worktreePath, _ string) e
 	return os.MkdirAll(worktreePath, 0o755)
 }
 
+func (m *mockRunner) AddWorktreeNewBranch(_ context.Context, _, worktreePath, _, _ string) error {
+	m.worktrees = append(m.worktrees, worktreePath)
+	if m.addWTErr != nil {
+		return m.addWTErr
+	}
+	return os.MkdirAll(worktreePath, 0o755)
+}
+
 func (m *mockRunner) RemoveWorktree(_ context.Context, _, worktreePath string) error {
 	m.removed = append(m.removed, worktreePath)
 	return os.RemoveAll(worktreePath)
+}
+
+func (m *mockRunner) BranchExists(_ context.Context, _, _ string) (bool, error) {
+	return m.branchExists, nil
+}
+
+func (m *mockRunner) DefaultBranch(_ context.Context, _ string) (string, error) {
+	return "main", nil
 }
 
 func testService(t *testing.T) (*Service, *mockRunner) {

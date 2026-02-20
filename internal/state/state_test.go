@@ -130,14 +130,14 @@ func TestValidate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "repo missing path",
+			name: "repo missing path is valid",
 			state: &State{
 				APIVersion: "flow/v1",
 				Kind:       "State",
 				Metadata:   Metadata{Name: "ws"},
 				Spec:       Spec{Repos: []Repo{{URL: "u", Branch: "b"}}},
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "second repo invalid",
@@ -159,6 +159,26 @@ func TestValidate(t *testing.T) {
 			err := Validate(tt.state)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestRepoPath(t *testing.T) {
+	tests := []struct {
+		name string
+		repo Repo
+		want string
+	}{
+		{"explicit path", Repo{URL: "git@github.com:org/repo.git", Path: "custom"}, "custom"},
+		{"ssh url", Repo{URL: "git@github.com:org/repo-name.git"}, "repo-name"},
+		{"https url", Repo{URL: "github.com/org/my-repo"}, "my-repo"},
+		{"trailing .git", Repo{URL: "https://github.com/org/foo.git"}, "foo"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := RepoPath(tt.repo); got != tt.want {
+				t.Errorf("RepoPath() = %q, want %q", got, tt.want)
 			}
 		})
 	}

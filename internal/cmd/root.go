@@ -60,6 +60,9 @@ func newRootCmd() *cobra.Command {
 
 	// Wire the logger after flags are parsed.
 	root.PersistentPreRun = func(_ *cobra.Command, _ []string) {
+		if verbose {
+			ui.SetPlain(true)
+		}
 		log := newLogger()
 		gitRunner.Log = log
 		svc.Log = log

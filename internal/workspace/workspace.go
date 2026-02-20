@@ -176,12 +176,17 @@ func (s *Service) Render(ctx context.Context, id string, progress func(msg strin
 		return err
 	}
 
+	if err := state.Validate(st); err != nil {
+		return fmt.Errorf("invalid state: %w", err)
+	}
+
 	wsDir := s.Config.WorkspacePath(id)
 	total := len(st.Spec.Repos)
 
 	for i, repo := range st.Spec.Repos {
+		repoPath := state.RepoPath(repo)
 		barePath := s.Config.BareRepoPath(repo.URL)
-		worktreePath := filepath.Join(wsDir, repo.Path)
+		worktreePath := filepath.Join(wsDir, repoPath)
 
 		progress(fmt.Sprintf("[%d/%d] %s", i+1, total, repo.URL))
 
@@ -203,15 +208,32 @@ func (s *Service) Render(ctx context.Context, id string, progress func(msg strin
 
 		// Create worktree if it doesn't exist
 		if _, err := os.Stat(worktreePath); os.IsNotExist(err) {
-			s.log().Debug("creating worktree", "path", worktreePath, "branch", repo.Branch)
-			if err := s.Git.AddWorktree(ctx, barePath, worktreePath, repo.Branch); err != nil {
-				return fmt.Errorf("creating worktree for %s: %w", repo.URL, err)
+			exists, err := s.Git.BranchExists(ctx, barePath, repo.Branch)
+			if err != nil {
+				return fmt.Errorf("checking branch for %s: %w", repo.URL, err)
+			}
+
+			if exists {
+				s.log().Debug("creating worktree from existing branch", "path", worktreePath, "branch", repo.Branch)
+				if err := s.Git.AddWorktree(ctx, barePath, worktreePath, repo.Branch); err != nil {
+					return fmt.Errorf("creating worktree for %s: %w", repo.URL, err)
+				}
+				progress(fmt.Sprintf("      └── %s (%s) ✓", repoPath, repo.Branch))
+			} else {
+				defaultBranch, err := s.Git.DefaultBranch(ctx, barePath)
+				if err != nil {
+					return fmt.Errorf("getting default branch for %s: %w", repo.URL, err)
+				}
+				s.log().Debug("creating worktree with new branch", "path", worktreePath, "branch", repo.Branch, "from", defaultBranch)
+				if err := s.Git.AddWorktreeNewBranch(ctx, barePath, worktreePath, repo.Branch, defaultBranch); err != nil {
+					return fmt.Errorf("creating worktree for %s: %w", repo.URL, err)
+				}
+				progress(fmt.Sprintf("      └── %s (%s, new branch from %s) ✓", repoPath, repo.Branch, defaultBranch))
 			}
 		} else {
 			s.log().Debug("worktree already exists, skipping", "path", worktreePath)
+			progress(fmt.Sprintf("      └── %s (%s) exists", repoPath, repo.Branch))
 		}
-
-		progress(fmt.Sprintf("      └── Worktree: %s (%s) ✓", repo.Path, repo.Branch))
 	}
 
 	return nil
@@ -230,7 +252,7 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	// Remove worktrees
 	for _, repo := range st.Spec.Repos {
 		barePath := s.Config.BareRepoPath(repo.URL)
-		worktreePath := filepath.Join(wsDir, repo.Path)
+		worktreePath := filepath.Join(wsDir, state.RepoPath(repo))
 
 		if _, err := os.Stat(worktreePath); err == nil {
 			s.log().Debug("removing worktree", "path", worktreePath)
