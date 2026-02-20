@@ -39,6 +39,7 @@ Tests use `t.TempDir()` for isolation. The workspace tests use a `mockRunner` th
 
 ## Conventions
 
+- Git: never force push. Create new commits instead of amending pushed commits.
 - Commit messages: single line, no co-authored-by
 - Errors: use sentinel errors with `fmt.Errorf("context: %w", err)` wrapping
 - Output: all user-facing output goes through `internal/ui/` — never use `fmt.Print*` directly
