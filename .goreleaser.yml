@@ -28,6 +28,7 @@ homebrew_casks:
     repository:
       owner: milldr
       name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     homepage: https://github.com/milldr/flow
     description: Multi-repo workspace manager using git worktrees
     binaries:
