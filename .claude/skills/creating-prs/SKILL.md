@@ -20,24 +20,32 @@ Brief motivation — what problem this solves or what it enables.
 
 ## Labels
 
-Every PR must have a semver label for release-drafter:
+Every PR needs a label for release-drafter. Use `gh pr create --label <label>` (repeatable) or `gh pr edit --add-label <label>`.
 
-| Label | When to use |
-|-------|-------------|
-| `patch` | Bug fixes, typos, small corrections |
-| `minor` | New features, enhancements (default) |
-| `major` | Breaking changes |
+**Semver labels** (determines version bump):
 
-Add with `gh pr create --label <label>` or `gh pr edit --add-label <label>`.
+| Label | Bump |
+|-------|------|
+| `major` | Major |
+| `minor`, `feature`, `enhancement` | Minor |
+| `patch`, `fix`, `bugfix`, `bug` | Patch |
 
-Optional category labels: `feature`, `fix`, `docs`.
+Default bump (no semver label): **minor**.
+
+**Category labels** (determines changelog section):
+
+| Label | Changelog section |
+|-------|-------------------|
+| `feature`, `enhancement` | New Features |
+| `fix`, `bugfix`, `bug` | Bug Fixes |
+| `docs`, `documentation` | Documentation |
 
 ## Example
 
 ```bash
 gh pr create \
   --title "Add workspace clone command" \
-  --label minor \
+  --label feature \
   --body "$(cat <<'EOF'
 ## What
 Adds `flow clone` to clone a workspace to a new ID.
