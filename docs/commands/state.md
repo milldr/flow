@@ -2,7 +2,7 @@
 
 Open the workspace state file in your editor (`$EDITOR` or `vim`).
 
-![flow state](gif/state.gif)
+![flow state](tapes/state.gif)
 
 ## Usage
 

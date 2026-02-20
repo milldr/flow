@@ -33,11 +33,11 @@ gendocs:
 
 vhs: build
 	bash demo-setup.sh
-	vhs docs/commands/init.tape
-	vhs docs/commands/state.tape
-	vhs docs/commands/render.tape
-	vhs docs/commands/exec.tape
-	vhs docs/commands/list.tape
-	vhs docs/commands/delete.tape
+	vhs docs/commands/tapes/init.tape
+	vhs docs/commands/tapes/state.tape
+	vhs docs/commands/tapes/render.tape
+	vhs docs/commands/tapes/exec.tape
+	vhs docs/commands/tapes/list.tape
+	vhs docs/commands/tapes/delete.tape
 
 docs: gendocs vhs

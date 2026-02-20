@@ -1,11 +1,11 @@
 # Regenerate: make docs
-Output docs/commands/gif/render.gif
+Output docs/commands/tapes/exec.gif
 
 Set Shell "bash"
 Set FontFamily "Menlo"
 Set FontSize 16
-Set Width 800
-Set Height 400
+Set Width 700
+Set Height 300
 Set Padding 20
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 60ms
@@ -31,9 +31,9 @@ Show
 
 Sleep 500ms
 
-Type "flow render demo"
+Type "flow exec demo -- ls"
 Sleep 500ms
 Enter
-Sleep 5s
+Sleep 3s
 
-Sleep 4s
+Sleep 3s

@@ -17,4 +17,4 @@ Each command has a reference page with usage, examples, and a GIF demo.
 make docs
 ```
 
-GIF recordings are generated with [VHS](https://github.com/charmbracelet/vhs) from `.tape` files in this directory. Output goes to [gif/](gif/).
+GIF recordings are generated with [VHS](https://github.com/charmbracelet/vhs) from `.tape` files in [tapes/](tapes/). Output GIFs go there too.

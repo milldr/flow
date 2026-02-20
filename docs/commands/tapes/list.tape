@@ -1,11 +1,11 @@
 # Regenerate: make docs
-Output docs/commands/gif/delete.gif
+Output docs/commands/tapes/list.gif
 
 Set Shell "bash"
 Set FontFamily "Menlo"
 Set FontSize 16
-Set Width 800
-Set Height 400
+Set Width 900
+Set Height 300
 Set Padding 20
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 60ms
@@ -31,9 +31,9 @@ Show
 
 Sleep 500ms
 
-Type "flow delete demo --force"
+Type "flow list"
 Sleep 500ms
 Enter
-Sleep 3s
+Sleep 4s
 
 Sleep 3s

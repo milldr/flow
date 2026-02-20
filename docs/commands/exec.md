@@ -2,7 +2,7 @@
 
 Run a command from the workspace directory.
 
-![flow exec](gif/exec.gif)
+![flow exec](tapes/exec.gif)
 
 ## Usage
 

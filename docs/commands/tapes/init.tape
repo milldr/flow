@@ -1,10 +1,10 @@
 # Regenerate: make docs
-Output docs/commands/gif/list.gif
+Output docs/commands/tapes/init.gif
 
 Set Shell "bash"
 Set FontFamily "Menlo"
 Set FontSize 16
-Set Width 900
+Set Width 700
 Set Height 300
 Set Padding 20
 Set Theme "Catppuccin Mocha"
@@ -31,9 +31,9 @@ Show
 
 Sleep 500ms
 
-Type "flow list"
+Type "flow init demo"
 Sleep 500ms
 Enter
-Sleep 4s
+Sleep 3s
 
 Sleep 3s
