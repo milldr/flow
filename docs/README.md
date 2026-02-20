@@ -1,5 +1,4 @@
 # Documentation
 
-- [Commands](commands/) — Per-command reference with GIF demos
-- [Reference](reference/) — Auto-generated CLI reference (`make gendocs`)
+- [Commands](commands/) — Auto-generated CLI reference with GIF demos
 - [PRDs](prd/) — Product requirement documents

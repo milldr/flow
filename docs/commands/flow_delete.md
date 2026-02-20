@@ -2,6 +2,9 @@
 
 Delete a workspace and its worktrees
 
+![flow delete](tapes/delete.gif)
+
+
 ```
 flow delete <workspace> [flags]
 ```

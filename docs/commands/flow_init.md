@@ -2,6 +2,9 @@
 
 Create a new empty workspace
 
+![flow init](tapes/init.gif)
+
+
 ### Synopsis
 
 Create a new empty workspace with a generated ID.

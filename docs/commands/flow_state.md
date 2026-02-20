@@ -1,23 +1,24 @@
-## flow exec
+## flow state
 
-Run a command from the workspace directory
+Open workspace state file in editor
+
+![flow state](tapes/state.gif)
+
 
 ```
-flow exec <workspace> -- <command> [flags]
+flow state <workspace> [flags]
 ```
 
 ### Examples
 
 ```
-  flow exec calm-delta -- cursor .
-  flow exec calm-delta -- git status
-  flow exec calm-delta -- ls -la
+  flow state calm-delta    # Opens state.yaml in $EDITOR
 ```
 
 ### Options
 
 ```
-  -h, --help   help for exec
+  -h, --help   help for state
 ```
 
 ### Options inherited from parent commands

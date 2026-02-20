@@ -1,21 +1,18 @@
-## flow render
+## flow list
 
-Create worktrees from workspace state file
+List all workspaces
 
-```
-flow render <workspace> [flags]
-```
+![flow list](tapes/list.gif)
 
-### Examples
 
 ```
-  flow render calm-delta
+flow list [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for render
+  -h, --help   help for list
 ```
 
 ### Options inherited from parent commands
