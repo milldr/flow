@@ -12,7 +12,7 @@ user-invocable: false
 |---------|-------------|
 | `flow list` | List all workspaces |
 | `flow state <workspace>` | Show workspace state (YAML manifest) |
-| `flow render <workspace>` | Materialize workspace (clone repos, create worktrees) |
+| `flow render <workspace>` | Clone repos and check out branches (creates worktrees) |
 | `flow exec <workspace> -- <cmd>` | Run a command inside the workspace directory |
 | `flow init <workspace>` | Create a new workspace interactively |
 | `flow delete <workspace>` | Delete a workspace and its worktrees |
@@ -31,15 +31,17 @@ metadata:
 spec:
   repos:
     - url: github.com/org/repo-a
-      branch: feat/my-feature
-      path: ./repo-a          # local directory name (optional, derived from URL)
+      branch: feat/my-feature   # the branch you want to work on
+      path: ./repo-a            # local directory name (optional, derived from URL)
     - url: github.com/org/repo-b
       branch: main
 ```
 
+**Important**: `branch` is the branch you want to work on, not a base branch. If the branch already exists in the remote, `flow render` checks it out. If it doesn't exist, flow automatically creates it off the repo's default branch (e.g., `main`). You do not need to clone repos yourself — `flow render` handles cloning, branch creation, and checkout.
+
 ## Editing State
 
-To modify a workspace (add/remove repos, change branches), edit the `state.yaml` file directly, then run `flow render <workspace>` to apply changes.
+To modify a workspace (add/remove repos, change branches), edit the `state.yaml` file directly, then run `flow render <workspace>` to apply changes. Flow will clone any new repos and check out the specified branches.
 
 ## Workspace Resolution
 
