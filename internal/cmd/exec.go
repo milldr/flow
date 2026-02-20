@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/milldr/flow/internal/iterm"
 	"github.com/milldr/flow/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -33,6 +34,8 @@ func newExecCmd(svc *workspace.Service) *cobra.Command {
 			}
 
 			wsDir := svc.Config.WorkspacePath(id)
+
+			iterm.SetTabColor(id)
 
 			c := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 			c.Dir = wsDir
