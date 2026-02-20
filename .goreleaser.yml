@@ -34,9 +34,10 @@ homebrew_casks:
     binaries:
       - flow
     hooks:
-      post_install: |
-        system_command "/usr/bin/xattr",
-                       args: ["-dr", "com.apple.quarantine", "#{staged_path}"]
+      post:
+        install: |
+          system_command "/usr/bin/xattr",
+                         args: ["-dr", "com.apple.quarantine", "#{staged_path}"]
 
 changelog:
   sort: asc
