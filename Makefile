@@ -3,7 +3,7 @@ MODULE := github.com/milldr/flow
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS := -ldflags "-s -w -X $(MODULE)/internal/cmd.version=$(VERSION)"
 
-.PHONY: build install test lint clean snapshot demo docs
+.PHONY: build install test lint clean snapshot demo docs gendocs vhs
 
 build:
 	go build $(LDFLAGS) -o $(BINARY) ./cmd/flow
@@ -28,7 +28,10 @@ demo: build
 	bash demo-setup.sh
 	vhs demo.tape
 
-docs: build
+gendocs:
+	go run ./cmd/gendocs
+
+vhs: build
 	bash demo-setup.sh
 	vhs docs/commands/init.tape
 	vhs docs/commands/state.tape
@@ -36,3 +39,5 @@ docs: build
 	vhs docs/commands/exec.tape
 	vhs docs/commands/list.tape
 	vhs docs/commands/delete.tape
+
+docs: gendocs vhs

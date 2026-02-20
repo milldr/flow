@@ -91,6 +91,11 @@ func newVersionCmd() *cobra.Command {
 	}
 }
 
+// NewRootCmd returns the root command for use by doc generation tools.
+func NewRootCmd() *cobra.Command {
+	return newRootCmd()
+}
+
 // Execute runs the root command.
 func Execute() error {
 	cmd := newRootCmd()
