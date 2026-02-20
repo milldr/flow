@@ -33,6 +33,10 @@ homebrew_casks:
     description: Multi-repo workspace manager using git worktrees
     binaries:
       - flow
+    hooks:
+      post_install: |
+        system_command "/usr/bin/xattr",
+                       args: ["-dr", "com.apple.quarantine", "#{staged_path}"]
 
 changelog:
   sort: asc
