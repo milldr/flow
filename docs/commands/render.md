@@ -2,7 +2,7 @@
 
 Materialize the workspace. Clones repos (or fetches if cached), creates worktrees for each repo/branch pair.
 
-![flow render](render.gif)
+![flow render](gif/render.gif)
 
 ## Usage
 

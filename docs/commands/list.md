@@ -2,7 +2,7 @@
 
 List all workspaces.
 
-![flow list](list.gif)
+![flow list](gif/list.gif)
 
 ## Usage
 

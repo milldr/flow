@@ -1,5 +1,5 @@
 # Regenerate: make docs
-Output docs/commands/init.gif
+Output docs/commands/gif/init.gif
 
 Set Shell "bash"
 Set FontFamily "Menlo"
@@ -31,7 +31,7 @@ Show
 
 Sleep 500ms
 
-Type "flow init my-project"
+Type "flow init demo"
 Sleep 500ms
 Enter
 Sleep 3s

@@ -2,7 +2,7 @@
 
 Create a new empty workspace with a generated ID. Optionally provide a human-friendly name.
 
-![flow init](init.gif)
+![flow init](gif/init.gif)
 
 ## Usage
 

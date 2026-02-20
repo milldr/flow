@@ -2,7 +2,7 @@
 
 Delete a workspace and its worktrees. Prompts for confirmation unless `--force` is passed.
 
-![flow delete](delete.gif)
+![flow delete](gif/delete.gif)
 
 ## Usage
 

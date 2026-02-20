@@ -1,5 +1,5 @@
 # Regenerate: make docs
-Output docs/commands/state.gif
+Output docs/commands/gif/state.gif
 
 Set Shell "bash"
 Set FontFamily "Menlo"
