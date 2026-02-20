@@ -22,7 +22,7 @@ func newExecCmd(svc *workspace.Service) *cobra.Command {
   flow exec calm-delta -- git status
   flow exec calm-delta -- ls -la`,
 		RunE: func(_ *cobra.Command, args []string) error {
-			id, _, err := resolveWorkspace(svc, args[0])
+			id, st, err := resolveWorkspace(svc, args[0])
 			if err != nil {
 				return err
 			}
@@ -36,6 +36,7 @@ func newExecCmd(svc *workspace.Service) *cobra.Command {
 			wsDir := svc.Config.WorkspacePath(id)
 
 			iterm.SetTabColor(id)
+			iterm.SetTabTitle(workspaceDisplayName(id, st))
 
 			c := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 			c.Dir = wsDir

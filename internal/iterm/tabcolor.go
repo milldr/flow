@@ -8,6 +8,13 @@ import (
 	"os"
 )
 
+// SetTabTitle sets the terminal tab title. Works in iTerm2 and most terminals
+// that support xterm title escape sequences.
+func SetTabTitle(title string) {
+	//nolint:errcheck // best-effort terminal escape sequence
+	fmt.Fprintf(os.Stdout, "\033]0;%s\a", title)
+}
+
 // SetTabColor sets the iTerm2 tab color based on a hash of the given key.
 // Each unique key gets a consistent, distinct color. No-op outside iTerm2.
 func SetTabColor(key string) {
