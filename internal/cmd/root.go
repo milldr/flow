@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"runtime/debug"
 
 	"github.com/milldr/flow/internal/agents"
 	"github.com/milldr/flow/internal/config"
@@ -17,6 +18,14 @@ var (
 	version = "dev"
 	verbose bool
 )
+
+func init() {
+	if version == "dev" {
+		if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+			version = info.Main.Version
+		}
+	}
+}
 
 func newLogger() *slog.Logger {
 	level := slog.LevelWarn
