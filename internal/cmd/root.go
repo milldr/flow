@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/milldr/flow/internal/agents"
 	"github.com/milldr/flow/internal/config"
 	"github.com/milldr/flow/internal/git"
 	"github.com/milldr/flow/internal/ui"
@@ -49,6 +50,11 @@ func newRootCmd() *cobra.Command {
 
 	if err := cfg.EnsureDirs(); err != nil {
 		ui.Errorf("creating directories: %v", err)
+		os.Exit(1)
+	}
+
+	if err := agents.EnsureSharedAgent(cfg.AgentsDir); err != nil {
+		ui.Errorf("setting up agent files: %v", err)
 		os.Exit(1)
 	}
 

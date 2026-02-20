@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/milldr/flow/internal/agents"
 	"github.com/milldr/flow/internal/config"
 	"github.com/milldr/flow/internal/git"
 	"github.com/milldr/flow/internal/state"
@@ -234,6 +235,11 @@ func (s *Service) Render(ctx context.Context, id string, progress func(msg strin
 			s.log().Debug("worktree already exists, skipping", "path", worktreePath)
 			progress(fmt.Sprintf("      └── %s (%s) exists", repoPath, repo.Branch))
 		}
+	}
+
+	// Set up Claude workspace files
+	if err := agents.SetupWorkspaceClaude(wsDir, s.Config.AgentsDir, st, id); err != nil {
+		return fmt.Errorf("setting up claude files: %w", err)
 	}
 
 	return nil

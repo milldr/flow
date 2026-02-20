@@ -25,6 +25,12 @@ func TestNewDefaultPath(t *testing.T) {
 	if cfg.ReposDir != filepath.Join(expected, "repos") {
 		t.Errorf("ReposDir = %q", cfg.ReposDir)
 	}
+	if cfg.AgentsDir != filepath.Join(expected, "agents") {
+		t.Errorf("AgentsDir = %q", cfg.AgentsDir)
+	}
+	if cfg.ConfigFile != filepath.Join(expected, "config.yaml") {
+		t.Errorf("ConfigFile = %q", cfg.ConfigFile)
+	}
 }
 
 func TestNewFlowHomeOverride(t *testing.T) {
@@ -79,19 +85,29 @@ func TestBareRepoPath(t *testing.T) {
 	}
 }
 
+func TestClaudeAgentDir(t *testing.T) {
+	cfg := &Config{Home: "/test", AgentsDir: "/test/agents"}
+	got := cfg.ClaudeAgentDir()
+	if got != "/test/agents/claude" {
+		t.Errorf("ClaudeAgentDir = %q, want /test/agents/claude", got)
+	}
+}
+
 func TestEnsureDirs(t *testing.T) {
 	dir := t.TempDir()
 	cfg := &Config{
 		Home:          dir,
 		WorkspacesDir: filepath.Join(dir, "workspaces"),
 		ReposDir:      filepath.Join(dir, "repos"),
+		AgentsDir:     filepath.Join(dir, "agents"),
+		ConfigFile:    filepath.Join(dir, "config.yaml"),
 	}
 
 	if err := cfg.EnsureDirs(); err != nil {
 		t.Fatalf("EnsureDirs: %v", err)
 	}
 
-	for _, d := range []string{cfg.WorkspacesDir, cfg.ReposDir} {
+	for _, d := range []string{cfg.WorkspacesDir, cfg.ReposDir, cfg.AgentsDir} {
 		info, err := os.Stat(d)
 		if err != nil {
 			t.Errorf("directory %q not created: %v", d, err)
@@ -100,8 +116,49 @@ func TestEnsureDirs(t *testing.T) {
 		}
 	}
 
+	// Config file should be created
+	if _, err := os.Stat(cfg.ConfigFile); err != nil {
+		t.Errorf("config file not created: %v", err)
+	}
+
+	// FlowConfig should be loaded
+	if cfg.FlowConfig == nil {
+		t.Fatal("FlowConfig not loaded")
+	}
+	if cfg.FlowConfig.APIVersion != "flow/v1" {
+		t.Errorf("FlowConfig.APIVersion = %q, want flow/v1", cfg.FlowConfig.APIVersion)
+	}
+
 	// Idempotent — calling again should not error
 	if err := cfg.EnsureDirs(); err != nil {
 		t.Fatalf("EnsureDirs (2nd call): %v", err)
+	}
+}
+
+func TestEnsureDirsLoadsExistingConfig(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &Config{
+		Home:          dir,
+		WorkspacesDir: filepath.Join(dir, "workspaces"),
+		ReposDir:      filepath.Join(dir, "repos"),
+		AgentsDir:     filepath.Join(dir, "agents"),
+		ConfigFile:    filepath.Join(dir, "config.yaml"),
+	}
+
+	// Pre-create a config file
+	fc := &FlowConfig{APIVersion: "flow/v1", Kind: "Config"}
+	if err := SaveFlowConfig(cfg.ConfigFile, fc); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cfg.EnsureDirs(); err != nil {
+		t.Fatalf("EnsureDirs: %v", err)
+	}
+
+	if cfg.FlowConfig == nil {
+		t.Fatal("FlowConfig not loaded from existing file")
+	}
+	if cfg.FlowConfig.Kind != "Config" {
+		t.Errorf("Kind = %q, want Config", cfg.FlowConfig.Kind)
 	}
 }

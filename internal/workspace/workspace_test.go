@@ -5,8 +5,10 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/milldr/flow/internal/agents"
 	"github.com/milldr/flow/internal/config"
 	"github.com/milldr/flow/internal/state"
 )
@@ -73,8 +75,13 @@ func testService(t *testing.T) (*Service, *mockRunner) {
 		Home:          dir,
 		WorkspacesDir: filepath.Join(dir, "workspaces"),
 		ReposDir:      filepath.Join(dir, "repos"),
+		AgentsDir:     filepath.Join(dir, "agents"),
+		ConfigFile:    filepath.Join(dir, "config.yaml"),
 	}
 	if err := cfg.EnsureDirs(); err != nil {
+		t.Fatal(err)
+	}
+	if err := agents.EnsureSharedAgent(cfg.AgentsDir); err != nil {
 		t.Fatal(err)
 	}
 	mock := &mockRunner{}
@@ -624,5 +631,60 @@ func TestGenerateUniqueIDAvoidsExisting(t *testing.T) {
 			}
 		}
 		existing = append(existing, id)
+	}
+}
+
+func TestRenderCreatesClaudeFiles(t *testing.T) {
+	svc, _ := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("claude-test", "Test Claude setup", []state.Repo{
+		{URL: "github.com/org/repo-a", Branch: "main", Path: "./repo-a"},
+		{URL: "github.com/org/repo-b", Branch: "feat/x", Path: "./repo-b"},
+	})
+
+	if err := svc.Create("claude-ws", st); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Render(ctx, "claude-ws", noop); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	wsDir := svc.Config.WorkspacePath("claude-ws")
+
+	// Workspace CLAUDE.md should exist with repo info
+	data, err := os.ReadFile(filepath.Join(wsDir, "CLAUDE.md"))
+	if err != nil {
+		t.Fatal("workspace CLAUDE.md not created")
+	}
+	content := string(data)
+	if !strings.Contains(content, "claude-test") {
+		t.Error("workspace CLAUDE.md missing name")
+	}
+	if !strings.Contains(content, "repo-a") {
+		t.Error("workspace CLAUDE.md missing repo-a")
+	}
+	if !strings.Contains(content, "repo-b") {
+		t.Error("workspace CLAUDE.md missing repo-b")
+	}
+
+	// .claude/CLAUDE.md should be a symlink to shared
+	target, err := os.Readlink(filepath.Join(wsDir, ".claude", "CLAUDE.md"))
+	if err != nil {
+		t.Fatal(".claude/CLAUDE.md symlink not created")
+	}
+	expected := filepath.Join(svc.Config.AgentsDir, "claude", "CLAUDE.md")
+	if target != expected {
+		t.Errorf(".claude/CLAUDE.md target = %q, want %q", target, expected)
+	}
+
+	// .claude/skills should be a symlink to shared
+	target, err = os.Readlink(filepath.Join(wsDir, ".claude", "skills"))
+	if err != nil {
+		t.Fatal(".claude/skills symlink not created")
+	}
+	expected = filepath.Join(svc.Config.AgentsDir, "claude", "skills")
+	if target != expected {
+		t.Errorf(".claude/skills target = %q, want %q", target, expected)
 	}
 }
