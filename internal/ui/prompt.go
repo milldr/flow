@@ -35,12 +35,27 @@ func SelectWorkspace(matches []WorkspaceOption) (string, error) {
 	return selected, err
 }
 
+// DeleteRepo holds repo display info for the delete confirmation prompt.
+type DeleteRepo struct {
+	Path   string
+	Branch string
+}
+
 // ConfirmDelete prompts the user to confirm workspace deletion.
-func ConfirmDelete(name string, repos []string) (bool, error) {
-	Warning("Delete workspace '" + name + "'?")
-	Print("    This will remove:")
-	for _, r := range repos {
-		Printf("    - %s (worktree)\n", r)
+func ConfirmDelete(name, id string, repos []DeleteRepo) (bool, error) {
+	title := fmt.Sprintf("Delete workspace '%s'", name)
+	if name != id {
+		title += fmt.Sprintf(" (%s)", id)
+	}
+	title += "?"
+
+	Warning(title)
+	if len(repos) > 0 {
+		Print("")
+		Print("  Repos:")
+		for _, r := range repos {
+			Printf("    %s (%s)\n", r.Path, r.Branch)
+		}
 	}
 	Print("")
 

@@ -26,12 +26,15 @@ func newDeleteCmd(svc *workspace.Service) *cobra.Command {
 			name := workspaceDisplayName(id, st)
 
 			if !force {
-				var repoPaths []string
-				for _, r := range st.Spec.Repos {
-					repoPaths = append(repoPaths, state.RepoPath(r))
+				repos := make([]ui.DeleteRepo, len(st.Spec.Repos))
+				for i, r := range st.Spec.Repos {
+					repos[i] = ui.DeleteRepo{
+						Path:   state.RepoPath(r),
+						Branch: r.Branch,
+					}
 				}
 
-				confirmed, err := ui.ConfirmDelete(name, repoPaths)
+				confirmed, err := ui.ConfirmDelete(name, id, repos)
 				if err != nil {
 					return err
 				}
