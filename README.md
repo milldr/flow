@@ -61,11 +61,34 @@ flow render calm-delta
 
 Flow fetches each repo into a bare clone cache (`~/.flow/repos/`), then creates lightweight worktrees in the workspace directory. Running `render` again is idempotent — it fetches updates and skips worktrees that already exist.
 
-## Commands
+## State file
 
-`flow init` | `flow state` | `flow render` | `flow exec` | `flow list` | `flow delete`
+Each workspace is defined by a `state.yaml` file. Run `flow state <workspace>` to open it in your editor.
 
-Every workspace has a generated **ID** (e.g. `calm-delta`) and an optional **name** (e.g. `vpc-ipv6`). All commands accept either.
+```yaml
+apiVersion: flow/v1
+kind: State
+metadata:
+  name: vpc-ipv6
+  description: IPv6 support across VPC services
+  created: "2026-02-18T12:00:00Z"
+spec:
+  repos:
+    - url: git@github.com:acme/vpc-service.git
+      branch: feature/ipv6
+      path: vpc-service
+    - url: git@github.com:acme/subnet-manager.git
+      branch: feature/ipv6
+      path: subnet-manager
+```
+
+| Field | Description |
+|-------|-------------|
+| `metadata.name` | Optional human-friendly name |
+| `metadata.description` | Optional description |
+| `spec.repos[].url` | Git remote URL |
+| `spec.repos[].branch` | Branch to check out |
+| `spec.repos[].path` | Directory name in the workspace (defaults to repo name) |
 
 See the full [command reference](docs/commands/) for usage, flags, examples, and GIF demos.
 
