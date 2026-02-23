@@ -14,7 +14,8 @@ Flow is designed to be called by other AI agents — tools like [OpenClaw](https
 
 Agents should call deterministic tools rather than relying on freeform interpretation with skills. This leads to more consistent results and reproducible environments.
 
-## Quickstart
+<details>
+<summary><strong>Quickstart</strong></summary>
 
 ### 1. Install
 
@@ -73,6 +74,8 @@ flow exec calm-delta -- claude
 Flow fetches each repo into a bare clone cache (`~/.flow/repos/`), then creates lightweight worktrees in the workspace directory. Running `render` again is idempotent — it fetches updates and skips worktrees that already exist.
 
 See the [spec reference](docs/specs/) for YAML file schemas and the [command reference](docs/commands/) for usage, flags, examples, and GIF demos.
+
+</details>
 
 ## What can it do?
 
