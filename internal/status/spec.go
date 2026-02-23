@@ -121,7 +121,7 @@ func DefaultSpec() *Spec {
 				{
 					Name:        "in-progress",
 					Description: "Local diffs or draft PR",
-					Check:       `git -C "$FLOW_REPO_PATH" status --porcelain 2>/dev/null | grep -q . || gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state open --json isDraft | jq -e 'map(select(.isDraft)) | length > 0' > /dev/null 2>&1`,
+					Check:       `git -C "$FLOW_REPO_PATH" status --porcelain 2>/dev/null | grep -q . || [ "$(git -C "$FLOW_REPO_PATH" rev-parse HEAD 2>/dev/null)" != "$(git ls-remote "$(git -C "$FLOW_REPO_PATH" remote get-url origin 2>/dev/null)" "$FLOW_REPO_BRANCH" 2>/dev/null | cut -f1)" ] || gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state open --json isDraft | jq -e 'map(select(.isDraft)) | length > 0' > /dev/null 2>&1`,
 				},
 				{
 					Name:        "open",
