@@ -77,7 +77,7 @@ See the [spec reference](docs/specs/) for YAML file schemas and the [command ref
 
 </details>
 
-## What can it do?
+## What it does
 
 🌊 **Workspaces as code** — Declare git worktrees in a YAML state file for instant, reproducible workspace setup across repos and branches.
 
