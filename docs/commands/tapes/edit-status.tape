@@ -42,20 +42,10 @@ Enter
 Sleep 2s
 
 # Vim opens the status spec. Browse the content.
-Sleep 2s
+Sleep 3s
 
-# Change "PR merged" description to "Work is merged"
-# Navigate to the "PR merged" line and change it
-Type@0ms "/PR merged"
-Enter
-Sleep 500ms
-Type@0ms "ciW"
-Type@30ms "Work is merged"
-Escape
-Sleep 2s
-
-# Save and quit
-Type ":wq"
+# Quit
+Type ":q"
 Enter
 Sleep 1500ms
 
