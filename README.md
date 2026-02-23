@@ -10,7 +10,7 @@ Working across multiple repos means repetitive setup, scattered branches, and cl
 
 ## Motivation
 
-Flow is designed to be called by other AI agents — tools like [OpenClaw](https://github.com/openclaw) that integrate with Slack, Linear, or other services to understand context and then programmatically create state files and initialize workspaces. Prompt OpenClaw, simply copy and paste a Slack thread or reference a Linear ticket, and let your agent create a workspace using Flow.
+Flow is designed to be called by other AI agents — tools like [OpenClaw](https://github.com/openclaw) that integrate with Slack, Linear, or other services to understand context and then programmatically create state files and initialize workspaces. Prompt OpenClaw with a Slack thread or Linear ticket and let your agent create the workspace using Flow 🌊
 
 Agents should call deterministic tools rather than relying on freeform interpretation with skills. This leads to more consistent results and reproducible environments.
 
