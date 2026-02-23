@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/milldr/flow/internal/status"
 )
 
 // Config holds resolved paths for Flow's directory structure.
@@ -79,6 +81,13 @@ func (c *Config) EnsureDirs() error {
 	// Create default config if missing, then load it
 	if _, err := os.Stat(c.ConfigFile); os.IsNotExist(err) {
 		if err := SaveFlowConfig(c.ConfigFile, DefaultFlowConfig()); err != nil {
+			return err
+		}
+	}
+
+	// Create default status spec if missing
+	if _, err := os.Stat(c.StatusSpecFile); os.IsNotExist(err) {
+		if err := status.Save(c.StatusSpecFile, status.DefaultSpec()); err != nil {
 			return err
 		}
 	}

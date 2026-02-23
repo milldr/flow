@@ -72,11 +72,12 @@ func testService(t *testing.T) (*Service, *mockRunner) {
 	t.Helper()
 	dir := t.TempDir()
 	cfg := &config.Config{
-		Home:          dir,
-		WorkspacesDir: filepath.Join(dir, "workspaces"),
-		ReposDir:      filepath.Join(dir, "repos"),
-		AgentsDir:     filepath.Join(dir, "agents"),
-		ConfigFile:    filepath.Join(dir, "config.yaml"),
+		Home:           dir,
+		WorkspacesDir:  filepath.Join(dir, "workspaces"),
+		ReposDir:       filepath.Join(dir, "repos"),
+		AgentsDir:      filepath.Join(dir, "agents"),
+		ConfigFile:     filepath.Join(dir, "config.yaml"),
+		StatusSpecFile: filepath.Join(dir, "status.yaml"),
 	}
 	if err := cfg.EnsureDirs(); err != nil {
 		t.Fatal(err)

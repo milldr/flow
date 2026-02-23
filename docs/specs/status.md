@@ -19,20 +19,20 @@ spec:
     - name: closed
       description: All PRs merged or closed
       check: >-
-        gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state merged --json number
+        gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state merged --json number
         | jq -e 'length > 0' > /dev/null 2>&1
-        && gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state open --json number
+        && gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state open --json number
         | jq -e 'length == 0' > /dev/null 2>&1
     - name: in-review
       description: Non-draft PR open
       check: >-
-        gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state open --json isDraft
+        gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state open --json isDraft
         | jq -e 'map(select(.isDraft == false)) | length > 0' > /dev/null 2>&1
     - name: in-progress
       description: Local diffs or draft PR
       check: >-
-        git -C "$FLOW_REPO_PATH" diff --name-only "origin/$FLOW_REPO_BRANCH" 2>/dev/null | grep -q .
-        || gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state open --json isDraft
+        git -C "$FLOW_REPO_PATH" status --porcelain 2>/dev/null | grep -q .
+        || gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state open --json isDraft
         | jq -e 'map(select(.isDraft)) | length > 0' > /dev/null 2>&1
     - name: open
       description: Workspace created, no changes yet
@@ -59,7 +59,10 @@ Each check command receives the following environment variables:
 |----------|-------------|
 | `FLOW_REPO_URL` | Repo URL from the state file |
 | `FLOW_REPO_BRANCH` | Branch name from the state file |
-| `FLOW_REPO_PATH` | Directory path in the workspace |
+| `FLOW_REPO_PATH` | Absolute path to the worktree directory |
+| `FLOW_REPO_SLUG` | Repo in `owner/repo` format (derived from URL, works with `gh --repo`) |
+| `FLOW_WORKSPACE_ID` | Workspace directory ID |
+| `FLOW_WORKSPACE_NAME` | Workspace display name |
 
 ## Resolution
 

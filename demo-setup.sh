@@ -116,7 +116,7 @@ spec:
       check: 'false'
     - name: in-progress
       description: Local diffs or draft PR
-      check: git -C "$FLOW_HOME/workspaces/\$FLOW_WORKSPACE_ID/\$FLOW_REPO_PATH" diff --name-only "origin/\$FLOW_REPO_BRANCH" 2>/dev/null | grep -q .
+      check: git -C "\$FLOW_REPO_PATH" diff --name-only "origin/\$FLOW_REPO_BRANCH" 2>/dev/null | grep -q .
     - name: open
       description: Workspace created, no changes yet
       default: true

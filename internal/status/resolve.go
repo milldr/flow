@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 )
@@ -33,12 +34,30 @@ type Resolver struct {
 	Runner CheckRunner
 }
 
+// repoSlug converts a repo URL to owner/repo format for gh CLI.
+// Handles SSH (git@github.com:org/repo.git) and HTTPS (github.com/org/repo) URLs.
+func repoSlug(url string) string {
+	s := url
+	// SSH: git@github.com:org/repo.git -> org/repo.git
+	if i := strings.Index(s, ":"); strings.Contains(s, "@") && i > 0 {
+		s = s[i+1:]
+	} else {
+		// HTTPS: github.com/org/repo -> org/repo
+		parts := strings.SplitN(s, "/", 2)
+		if len(parts) == 2 {
+			s = parts[1]
+		}
+	}
+	return strings.TrimSuffix(s, ".git")
+}
+
 // buildEnv creates the environment variables for a status check.
 func buildEnv(repo RepoInfo, wsID, wsName string) []string {
 	return []string{
 		"FLOW_REPO_URL=" + repo.URL,
 		"FLOW_REPO_BRANCH=" + repo.Branch,
 		"FLOW_REPO_PATH=" + repo.Path,
+		"FLOW_REPO_SLUG=" + repoSlug(repo.URL),
 		"FLOW_WORKSPACE_ID=" + wsID,
 		"FLOW_WORKSPACE_NAME=" + wsName,
 	}

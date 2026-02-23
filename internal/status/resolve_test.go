@@ -175,6 +175,25 @@ func TestResolveWorkspaceAllClosed(t *testing.T) {
 	}
 }
 
+func TestRepoSlug(t *testing.T) {
+	tests := []struct {
+		url  string
+		want string
+	}{
+		{"git@github.com:org/repo.git", "org/repo"},
+		{"git@github.com:org/repo", "org/repo"},
+		{"github.com/org/repo", "org/repo"},
+		{"github.com/org/repo.git", "org/repo"},
+		{"git@gitlab.com:deep/nested/repo.git", "deep/nested/repo"},
+	}
+	for _, tt := range tests {
+		got := repoSlug(tt.url)
+		if got != tt.want {
+			t.Errorf("repoSlug(%q) = %q, want %q", tt.url, got, tt.want)
+		}
+	}
+}
+
 // perRepoRunner distinguishes check results by repo URL (extracted from env).
 type perRepoRunner struct {
 	results map[string]map[string]bool // repoURL -> command -> result

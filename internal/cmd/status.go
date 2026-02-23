@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"path/filepath"
+
 	"github.com/milldr/flow/internal/config"
 	"github.com/milldr/flow/internal/state"
 	"github.com/milldr/flow/internal/status"
@@ -95,7 +97,7 @@ func runStatusAll(ctx context.Context, svc *workspace.Service, cfg *config.Confi
 				continue
 			}
 
-			repos := stateReposToInfo(st)
+			repos := stateReposToInfo(st, cfg.WorkspacePath(info.ID))
 			wsName := info.Name
 			if wsName == "" {
 				wsName = info.ID
@@ -150,7 +152,7 @@ func runStatusWorkspace(ctx context.Context, svc *workspace.Service, cfg *config
 		return err
 	}
 
-	repos := stateReposToInfo(st)
+	repos := stateReposToInfo(st, cfg.WorkspacePath(id))
 	wsName := workspaceDisplayName(id, st)
 
 	var result *status.WorkspaceResult
@@ -178,13 +180,14 @@ func runStatusWorkspace(ctx context.Context, svc *workspace.Service, cfg *config
 }
 
 // stateReposToInfo converts state repos to status RepoInfo slice.
-func stateReposToInfo(st *state.State) []status.RepoInfo {
+// wsDir is the absolute workspace directory so FLOW_REPO_PATH is a full path.
+func stateReposToInfo(st *state.State, wsDir string) []status.RepoInfo {
 	repos := make([]status.RepoInfo, len(st.Spec.Repos))
 	for i, r := range st.Spec.Repos {
 		repos[i] = status.RepoInfo{
 			URL:    r.URL,
 			Branch: r.Branch,
-			Path:   state.RepoPath(r),
+			Path:   filepath.Join(wsDir, state.RepoPath(r)),
 		}
 	}
 	return repos

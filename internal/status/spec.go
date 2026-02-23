@@ -111,17 +111,17 @@ func DefaultSpec() *Spec {
 				{
 					Name:        "closed",
 					Description: "All PRs merged or closed",
-					Check:       `gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state merged --json number | jq -e 'length > 0' > /dev/null 2>&1 && gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state open --json number | jq -e 'length == 0' > /dev/null 2>&1`,
+					Check:       `gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state merged --json number | jq -e 'length > 0' > /dev/null 2>&1 && gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state open --json number | jq -e 'length == 0' > /dev/null 2>&1`,
 				},
 				{
 					Name:        "in-review",
 					Description: "Non-draft PR open",
-					Check:       `gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state open --json isDraft | jq -e 'map(select(.isDraft == false)) | length > 0' > /dev/null 2>&1`,
+					Check:       `gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state open --json isDraft | jq -e 'map(select(.isDraft == false)) | length > 0' > /dev/null 2>&1`,
 				},
 				{
 					Name:        "in-progress",
 					Description: "Local diffs or draft PR",
-					Check:       `git -C "$FLOW_REPO_PATH" diff --name-only "origin/$FLOW_REPO_BRANCH" 2>/dev/null | grep -q . || gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state open --json isDraft | jq -e 'map(select(.isDraft)) | length > 0' > /dev/null 2>&1`,
+					Check:       `git -C "$FLOW_REPO_PATH" status --porcelain 2>/dev/null | grep -q . || gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state open --json isDraft | jq -e 'map(select(.isDraft)) | length > 0' > /dev/null 2>&1`,
 				},
 				{
 					Name:        "open",
