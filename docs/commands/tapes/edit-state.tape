@@ -45,11 +45,11 @@ Type@0ms "G$F[C"
 Sleep 500ms
 
 Enter
-Type@30ms "        - url: github.com/acme/app"
+Type@30ms "        - url: github.com/acme/web"
 Enter
-Type@30ms "          branch: feature/ipv6"
+Type@30ms "          branch: feat/dashboard"
 Enter
-Type@30ms "          path: app"
+Type@30ms "          path: web"
 Sleep 2s
 
 Escape
