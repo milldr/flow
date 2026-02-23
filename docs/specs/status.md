@@ -33,13 +33,28 @@ spec:
   statuses:
     - name: closed
       description: All PRs merged or closed
-      check: <shell command>
+      # AI-generated — exits 0 when a merged PR exists and no open PRs remain
+      check: >-
+        gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state merged --json number
+        | jq -e 'length > 0' > /dev/null 2>&1
+        && gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state open --json number
+        | jq -e 'length == 0' > /dev/null 2>&1
     - name: in-review
       description: Non-draft PR open
-      check: <shell command>
+      # AI-generated — exits 0 when a non-draft PR is open for the branch
+      check: >-
+        gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state open --json isDraft
+        | jq -e 'map(select(.isDraft == false)) | length > 0' > /dev/null 2>&1
     - name: in-progress
       description: Uncommitted changes, unpushed commits, or draft PR
-      check: <shell command>
+      # AI-generated — exits 0 when the worktree is dirty, local HEAD differs from remote, or a draft PR exists
+      check: >-
+        git -C "$FLOW_REPO_PATH" status --porcelain 2>/dev/null | grep -q .
+        || [ "$(git -C "$FLOW_REPO_PATH" rev-parse HEAD 2>/dev/null)"
+        != "$(git ls-remote "$(git -C "$FLOW_REPO_PATH" remote get-url origin 2>/dev/null)"
+        "$FLOW_REPO_BRANCH" 2>/dev/null | cut -f1)" ]
+        || gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state open --json isDraft
+        | jq -e 'map(select(.isDraft)) | length > 0' > /dev/null 2>&1
     - name: open
       description: Workspace created, no changes yet
       default: true
