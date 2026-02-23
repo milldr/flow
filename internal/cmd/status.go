@@ -165,7 +165,7 @@ func runStatusWorkspace(ctx context.Context, svc *workspace.Service, cfg *config
 		return err
 	}
 
-	fmt.Printf("Status: %s\n\n", result.Status)
+	fmt.Printf("Status: %s\n", result.Status)
 
 	if len(result.Repos) > 0 {
 		headers := []string{"REPO", "BRANCH", "STATUS"}
