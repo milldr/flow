@@ -76,11 +76,11 @@ See the [spec reference](docs/specs/) for YAML file schemas and the [command ref
 
 ## What can it do?
 
-| Feature | Description |
-|---------|-------------|
-| **Workspaces as code** | Declare git worktrees in a YAML state file for instant, reproducible workspace setup across repos and branches. |
-| **Status tracking** | Define custom check commands that dynamically resolve the status of each repo in a workspace. |
-| **AI agent integration** | Generate shared context files and agent instructions across repos so your AI tools have the right skills and knowledge from the start. |
+🌊 **Workspaces as code** — Declare git worktrees in a YAML state file for instant, reproducible workspace setup across repos and branches.
+
+🚦 **Status tracking** — Define custom check commands that dynamically resolve the status of each repo in a workspace.
+
+🤖 **AI agent integration** — Generate shared context files and agent instructions across repos so your AI tools have the right skills and knowledge from the start.
 
 ## How it works
 
