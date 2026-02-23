@@ -14,10 +14,10 @@ Flow is designed to be called by other AI agents — tools like [OpenClaw](https
 
 Agents should call deterministic tools rather than relying on freeform interpretation with skills. This leads to more consistent results and reproducible environments.
 
-<details>
-<summary><strong>Quickstart</strong></summary>
+## Quickstart
 
-### 1. Install
+<details>
+<summary><strong>Install</strong></summary>
 
 ```bash
 brew install milldr/tap/flow
@@ -37,7 +37,12 @@ cd flow
 make install
 ```
 
-### 2. Create a workspace
+</details>
+
+<details>
+<summary><strong>Usage</strong></summary>
+
+### 1. Create a workspace
 
 ```bash
 flow init
@@ -49,13 +54,13 @@ flow init
   Next: flow edit state calm-delta
 ```
 
-### 3. Add repos
+### 2. Add repos
 
 ```bash
 flow edit state calm-delta     # Open state.yaml in $EDITOR
 ```
 
-### 4. Render it
+### 3. Render it
 
 ```bash
 flow render calm-delta
@@ -65,7 +70,7 @@ flow render calm-delta
 ✓ Workspace ready
 ```
 
-### 5. Launch your editor
+### 4. Launch your editor
 
 ```bash
 flow exec calm-delta -- claude
