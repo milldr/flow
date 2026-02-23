@@ -57,7 +57,7 @@ Sleep 500ms
 
 # Now in insert mode after "    repos: " — type the repo entry
 Enter
-Type@30ms "        - url: /tmp/demo/app"
+Type@30ms "        - url: github.com/acme/app"
 Enter
 Type@30ms "          branch: feature/ipv6"
 Enter

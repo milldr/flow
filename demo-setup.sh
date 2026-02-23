@@ -18,3 +18,10 @@ git -C "$dir" checkout -q -b feature/ipv6
 echo "// IPv6 support" >> "$dir/main.go"
 git -C "$dir" add .
 git -C "$dir" commit -q -m "add ipv6 support"
+
+# Pre-populate the bare clone cache so tapes can use a realistic URL.
+# Flow looks up repos by URL → ~/.flow/repos/<url>.git
+# The bare clone's origin still points at the local repo, so fetches work.
+bare="/tmp/flow-demo/.flow/repos/github.com/acme/app.git"
+mkdir -p "$(dirname "$bare")"
+git clone --bare "$dir" "$bare" -q

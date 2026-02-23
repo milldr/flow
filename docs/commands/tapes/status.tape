@@ -23,37 +23,6 @@ Type `export PATH="$(pwd):$PATH"`
 Enter
 Sleep 200ms
 
-# Overwrite status spec with demo-friendly checks that work locally
-Type `cat > /tmp/flow-demo/.flow/status.yaml << 'SPECEOF'`
-Enter
-Type `apiVersion: flow/v1`
-Enter
-Type `kind: Status`
-Enter
-Type `statuses:`
-Enter
-Type `  - name: closed`
-Enter
-Type `    description: Work is merged`
-Enter
-Type `    check: 'test "$FLOW_REPO_BRANCH" = "main"'`
-Enter
-Type `  - name: in-review`
-Enter
-Type `    description: Feature branch active`
-Enter
-Type `    check: 'test "$FLOW_REPO_BRANCH" != "main"'`
-Enter
-Type `  - name: in-progress`
-Enter
-Type `    description: Active development`
-Enter
-Type `    default: true`
-Enter
-Type `SPECEOF`
-Enter
-Sleep 200ms
-
 Type "clear"
 Enter
 Sleep 500ms

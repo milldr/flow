@@ -45,7 +45,7 @@ Type@0ms "G$F[C"
 Sleep 500ms
 
 Enter
-Type@30ms "        - url: /tmp/demo/app"
+Type@30ms "        - url: github.com/acme/app"
 Enter
 Type@30ms "          branch: feature/ipv6"
 Enter
