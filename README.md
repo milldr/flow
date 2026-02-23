@@ -8,6 +8,12 @@ Working across multiple repos means repetitive setup, scattered branches, and cl
 
 ![flow demo](demo.gif)
 
+## Motivation
+
+Flow is designed to be called by other AI agents — tools like [OpenClaw](https://github.com/openclaw) that integrate with Slack, Linear, or other services to understand context and then programmatically create state files and initialize workspaces. Prompt OpenClaw, simply copy and paste a Slack thread or reference a Linear ticket, and let your agent create a workspace using Flow.
+
+Agents should call deterministic tools rather than relying on freeform interpretation with skills. This leads to more consistent results and reproducible environments.
+
 ## Quickstart
 
 ### 1. Install
@@ -39,13 +45,13 @@ flow init
 ```
 ✓ Created workspace calm-delta
 
-  Next: flow state calm-delta
+  Next: flow edit state calm-delta
 ```
 
 ### 3. Add repos
 
 ```bash
-flow state calm-delta     # Open state.yaml in $EDITOR
+flow edit state calm-delta     # Open state.yaml in $EDITOR
 ```
 
 ### 4. Render it
@@ -66,7 +72,7 @@ Flow fetches each repo into a bare clone cache (`~/.flow/repos/`), then creates 
 
 ## State file
 
-Each workspace is defined by a `state.yaml` file. Run `flow state <workspace>` to open it in your editor.
+Each workspace is defined by a `state.yaml` file. Run `flow edit state <workspace>` to open it in your editor.
 
 ```yaml
 apiVersion: flow/v1
@@ -95,20 +101,30 @@ spec:
 
 See the full [command reference](docs/commands/) for usage, flags, examples, and GIF demos.
 
+## What can it do?
+
+- **Define workspaces as code** — Declare git worktrees in a YAML state file for instant, reproducible workspace setup across repos and branches.
+- **Track workspace status** — Define custom check commands that dynamically resolve the status of each repo in a workspace (e.g. PR open, merged, in progress).
+- **Integrate with AI agents** — Drop your AI agent into a rendered workspace to work across multiple repos with full context.
+
 ## How it works
 
 Flow stores everything under `~/.flow` (override with `$FLOW_HOME`):
 
 ```
 ~/.flow/
+├── config.yaml                         # Global config
+├── status.yaml                         # Global status spec
 ├── workspaces/
 │   └── calm-delta/                     # Workspace ID
 │       ├── state.yaml                  # Workspace manifest (name: vpc-ipv6)
+│       ├── status.yaml                 # Optional workspace-specific status spec
 │       ├── vpc-service/                # Worktree
 │       └── subnet-manager/             # Worktree
-└── cache/
-    ├── acme-vpc-service.git/           # Bare clone
-    └── acme-subnet-manager.git/        # Bare clone
+└── repos/
+    └── github.com/acme/
+        ├── vpc-service.git/            # Bare clone
+        └── subnet-manager.git/         # Bare clone
 ```
 
 Bare clones are shared across workspaces. Worktrees are cheap — they share the object store with the bare clone, so multiple workspaces pointing at the same repo don't duplicate data.
