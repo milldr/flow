@@ -44,41 +44,37 @@ make install
 
 ### 1. Create a workspace
 
+Flow creates a workspace with an empty state file.
+
 ```bash
 flow init
 ```
 
-```
-✓ Created workspace calm-delta
-
-  Next: flow edit state calm-delta
-```
-
 ### 2. Add repos
 
+Open the state file in `$EDITOR` and define which repos and branches belong together.
+
 ```bash
-flow edit state calm-delta     # Open state.yaml in $EDITOR
+flow edit state calm-delta
 ```
 
 ### 3. Render it
+
+Flow fetches each repo into a shared bare clone cache, then creates lightweight worktrees in the workspace directory. Rendering is idempotent — re-running fetches updates and skips worktrees that already exist.
 
 ```bash
 flow render calm-delta
 ```
 
-```
-✓ Workspace ready
-```
+### 4. Start working
 
-### 4. Launch your editor
+Launch your default agent directly into the workspace. Flow reads the `spec.agents` list from your global config and runs the one marked `default: true`.
 
 ```bash
-flow exec calm-delta -- claude
+flow exec calm-delta
 ```
 
-Flow fetches each repo into a bare clone cache (`~/.flow/repos/`), then creates lightweight worktrees in the workspace directory. Running `render` again is idempotent — it fetches updates and skips worktrees that already exist.
-
-See the [spec reference](docs/specs/) for YAML file schemas and the [command reference](docs/commands/) for usage, flags, examples, and GIF demos.
+See the [spec reference](docs/specs/) for YAML file schemas and the [command reference](docs/commands/) for all commands.
 
 </details>
 
