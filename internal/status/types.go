@@ -1,11 +1,16 @@
 // Package status handles status spec loading, validation, and resolution.
 package status
 
+// SpecBody holds the statuses list nested under spec.
+type SpecBody struct {
+	Statuses []Entry `yaml:"statuses,omitempty"`
+}
+
 // Spec represents a status spec file.
 type Spec struct {
-	APIVersion string  `yaml:"apiVersion"`
-	Kind       string  `yaml:"kind"`
-	Statuses   []Entry `yaml:"statuses"`
+	APIVersion string   `yaml:"apiVersion"`
+	Kind       string   `yaml:"kind"`
+	Spec       SpecBody `yaml:"spec,omitempty"`
 }
 
 // Entry defines a single status in the spec.

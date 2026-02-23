@@ -54,14 +54,14 @@ func Validate(s *Spec) error {
 	if s.Kind != "Status" {
 		return ErrInvalidKind
 	}
-	if len(s.Statuses) == 0 {
+	if len(s.Spec.Statuses) == 0 {
 		return ErrNoStatuses
 	}
 
 	seen := make(map[string]bool)
 	defaults := 0
 
-	for i, e := range s.Statuses {
+	for i, e := range s.Spec.Statuses {
 		if e.Name == "" {
 			return fmt.Errorf("statuses[%d]: %w", i, ErrMissingName)
 		}
@@ -106,21 +106,28 @@ func DefaultSpec() *Spec {
 	return &Spec{
 		APIVersion: "flow/v1",
 		Kind:       "Status",
-		Statuses: []Entry{
-			{
-				Name:        "closed",
-				Description: "PR merged",
-				Check:       `gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state merged --json number | jq -e 'length > 0' > /dev/null 2>&1`,
-			},
-			{
-				Name:        "in-review",
-				Description: "PR open",
-				Check:       `gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state open --json number | jq -e 'length > 0' > /dev/null 2>&1`,
-			},
-			{
-				Name:        "in-progress",
-				Description: "Active development",
-				Default:     true,
+		Spec: SpecBody{
+			Statuses: []Entry{
+				{
+					Name:        "closed",
+					Description: "All PRs merged or closed",
+					Check:       `gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state merged --json number | jq -e 'length > 0' > /dev/null 2>&1 && gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state open --json number | jq -e 'length == 0' > /dev/null 2>&1`,
+				},
+				{
+					Name:        "in-review",
+					Description: "Non-draft PR open",
+					Check:       `gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state open --json isDraft | jq -e 'map(select(.isDraft == false)) | length > 0' > /dev/null 2>&1`,
+				},
+				{
+					Name:        "in-progress",
+					Description: "Local diffs or draft PR",
+					Check:       `git -C "$FLOW_REPO_PATH" diff --name-only "origin/$FLOW_REPO_BRANCH" 2>/dev/null | grep -q . || gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state open --json isDraft | jq -e 'map(select(.isDraft)) | length > 0' > /dev/null 2>&1`,
+				},
+				{
+					Name:        "open",
+					Description: "Workspace created, no changes yet",
+					Default:     true,
+				},
 			},
 		},
 	}

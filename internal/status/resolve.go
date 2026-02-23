@@ -49,7 +49,7 @@ func buildEnv(repo RepoInfo, wsID, wsName string) []string {
 func (r *Resolver) ResolveRepo(ctx context.Context, spec *Spec, repo RepoInfo, wsID, wsName string) string {
 	env := buildEnv(repo, wsID, wsName)
 
-	for _, entry := range spec.Statuses {
+	for _, entry := range spec.Spec.Statuses {
 		if entry.Default {
 			return entry.Name
 		}
@@ -73,7 +73,7 @@ func (r *Resolver) ResolveWorkspace(ctx context.Context, spec *Spec, repos []Rep
 
 	if len(repos) == 0 {
 		// No repos — use the default status.
-		for _, e := range spec.Statuses {
+		for _, e := range spec.Spec.Statuses {
 			if e.Default {
 				result.Status = e.Name
 				break
@@ -103,8 +103,8 @@ func (r *Resolver) ResolveWorkspace(ctx context.Context, spec *Spec, repos []Rep
 	wg.Wait()
 
 	// Build index map for ordering.
-	orderIndex := make(map[string]int, len(spec.Statuses))
-	for i, e := range spec.Statuses {
+	orderIndex := make(map[string]int, len(spec.Spec.Statuses))
+	for i, e := range spec.Spec.Statuses {
 		orderIndex[e.Name] = i
 	}
 
@@ -117,7 +117,7 @@ func (r *Resolver) ResolveWorkspace(ctx context.Context, spec *Spec, repos []Rep
 		}
 	}
 	if worstIdx >= 0 {
-		result.Status = spec.Statuses[worstIdx].Name
+		result.Status = spec.Spec.Statuses[worstIdx].Name
 	}
 
 	return result

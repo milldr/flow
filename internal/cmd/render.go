@@ -30,9 +30,11 @@ func newRenderCmd(svc *workspace.Service) *cobra.Command {
 			ui.Print("")
 			ui.Success("Workspace ready")
 			ui.Print("")
-			ui.Printf("  %s\n", ui.Code("flow exec "+name+" -- <command>"))
-			ui.Printf("  %s\n", ui.Code("flow exec "+name+" -- cursor ."))
-			ui.Printf("  %s\n", ui.Code("flow exec "+name+" -- claude"))
+			if len(svc.Config.FlowConfig.Spec.Agents) > 0 {
+				ui.Printf("  %s\n", ui.Code("flow exec "+name))
+			} else {
+				ui.Printf("  %s\n", ui.Code("flow exec "+name+" -- <command>"))
+			}
 
 			return nil
 		},

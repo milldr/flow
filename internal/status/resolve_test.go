@@ -22,10 +22,13 @@ func testSpec() *Spec {
 	return &Spec{
 		APIVersion: "flow/v1",
 		Kind:       "Status",
-		Statuses: []Entry{
-			{Name: "closed", Check: "check-closed"},
-			{Name: "in-review", Check: "check-review"},
-			{Name: "in-progress", Default: true},
+		Spec: SpecBody{
+			Statuses: []Entry{
+				{Name: "closed", Check: "check-closed"},
+				{Name: "in-review", Check: "check-review"},
+				{Name: "in-progress", Check: "check-progress"},
+				{Name: "open", Default: true},
+			},
 		},
 	}
 }
@@ -60,10 +63,11 @@ func TestResolveRepoSecondMatch(t *testing.T) {
 	}
 }
 
-func TestResolveRepoDefault(t *testing.T) {
+func TestResolveRepoThirdMatch(t *testing.T) {
 	mock := &mockRunner{results: map[string]bool{
-		"check-closed": false,
-		"check-review": false,
+		"check-closed":   false,
+		"check-review":   false,
+		"check-progress": true,
 	}}
 	resolver := &Resolver{Runner: mock}
 
@@ -71,14 +75,31 @@ func TestResolveRepoDefault(t *testing.T) {
 	status := resolver.ResolveRepo(context.Background(), testSpec(), repo, "ws-1", "my-ws")
 
 	if status != "in-progress" {
-		t.Errorf("expected in-progress (default), got %q", status)
+		t.Errorf("expected in-progress, got %q", status)
+	}
+}
+
+func TestResolveRepoDefault(t *testing.T) {
+	mock := &mockRunner{results: map[string]bool{
+		"check-closed":   false,
+		"check-review":   false,
+		"check-progress": false,
+	}}
+	resolver := &Resolver{Runner: mock}
+
+	repo := RepoInfo{URL: "github.com/org/repo", Branch: "feat/x", Path: "./repo"}
+	status := resolver.ResolveRepo(context.Background(), testSpec(), repo, "ws-1", "my-ws")
+
+	if status != "open" {
+		t.Errorf("expected open (default), got %q", status)
 	}
 }
 
 func TestResolveWorkspaceSingleRepo(t *testing.T) {
 	mock := &mockRunner{results: map[string]bool{
-		"check-closed": false,
-		"check-review": true,
+		"check-closed":   false,
+		"check-review":   true,
+		"check-progress": false,
 	}}
 	resolver := &Resolver{Runner: mock}
 
@@ -104,7 +125,7 @@ func TestResolveWorkspaceMultiRepoLeastAdvanced(t *testing.T) {
 	perRepoMock := &perRepoRunner{
 		results: map[string]map[string]bool{
 			"github.com/org/repo-a": {"check-closed": true},
-			"github.com/org/repo-b": {"check-closed": false, "check-review": true},
+			"github.com/org/repo-b": {"check-closed": false, "check-review": true, "check-progress": false},
 		},
 	}
 	resolver := &Resolver{Runner: perRepoMock}
@@ -132,8 +153,8 @@ func TestResolveWorkspaceNoRepos(t *testing.T) {
 
 	result := resolver.ResolveWorkspace(context.Background(), testSpec(), nil, "ws-1", "my-ws")
 
-	if result.Status != "in-progress" {
-		t.Errorf("workspace status = %q, want in-progress (default)", result.Status)
+	if result.Status != "open" {
+		t.Errorf("workspace status = %q, want open (default)", result.Status)
 	}
 }
 

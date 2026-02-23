@@ -26,8 +26,8 @@ func TestLoadAndSave(t *testing.T) {
 	if loaded.Kind != "Status" {
 		t.Errorf("Kind = %q, want Status", loaded.Kind)
 	}
-	if len(loaded.Statuses) != 3 {
-		t.Errorf("Statuses count = %d, want 3", len(loaded.Statuses))
+	if len(loaded.Spec.Statuses) != 4 {
+		t.Errorf("Statuses count = %d, want 4", len(loaded.Spec.Statuses))
 	}
 }
 
@@ -75,9 +75,9 @@ func TestValidateNoDefault(t *testing.T) {
 	spec := &Spec{
 		APIVersion: "flow/v1",
 		Kind:       "Status",
-		Statuses: []Entry{
+		Spec: SpecBody{Statuses: []Entry{
 			{Name: "open", Check: "true"},
-		},
+		}},
 	}
 	err := Validate(spec)
 	if !errors.Is(err, ErrNoDefault) {
@@ -89,10 +89,10 @@ func TestValidateMultipleDefaults(t *testing.T) {
 	spec := &Spec{
 		APIVersion: "flow/v1",
 		Kind:       "Status",
-		Statuses: []Entry{
+		Spec: SpecBody{Statuses: []Entry{
 			{Name: "a", Default: true},
 			{Name: "b", Default: true},
-		},
+		}},
 	}
 	err := Validate(spec)
 	if !errors.Is(err, ErrMultipleDefaults) {
@@ -104,10 +104,10 @@ func TestValidateDuplicateName(t *testing.T) {
 	spec := &Spec{
 		APIVersion: "flow/v1",
 		Kind:       "Status",
-		Statuses: []Entry{
+		Spec: SpecBody{Statuses: []Entry{
 			{Name: "open", Check: "true"},
 			{Name: "open", Default: true},
-		},
+		}},
 	}
 	err := Validate(spec)
 	if !errors.Is(err, ErrDuplicateName) {
@@ -119,9 +119,9 @@ func TestValidateMissingName(t *testing.T) {
 	spec := &Spec{
 		APIVersion: "flow/v1",
 		Kind:       "Status",
-		Statuses: []Entry{
+		Spec: SpecBody{Statuses: []Entry{
 			{Check: "true"},
-		},
+		}},
 	}
 	err := Validate(spec)
 	if !errors.Is(err, ErrMissingName) {
@@ -133,10 +133,10 @@ func TestValidateMissingCheck(t *testing.T) {
 	spec := &Spec{
 		APIVersion: "flow/v1",
 		Kind:       "Status",
-		Statuses: []Entry{
+		Spec: SpecBody{Statuses: []Entry{
 			{Name: "open"},
 			{Name: "default", Default: true},
-		},
+		}},
 	}
 	err := Validate(spec)
 	if !errors.Is(err, ErrMissingCheck) {
@@ -152,9 +152,9 @@ func TestLoadWithFallbackWorkspaceLevel(t *testing.T) {
 	wsSpec := &Spec{
 		APIVersion: "flow/v1",
 		Kind:       "Status",
-		Statuses: []Entry{
+		Spec: SpecBody{Statuses: []Entry{
 			{Name: "ws-only", Default: true},
-		},
+		}},
 	}
 	if err := Save(wsPath, wsSpec); err != nil {
 		t.Fatal(err)
@@ -167,8 +167,8 @@ func TestLoadWithFallbackWorkspaceLevel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadWithFallback: %v", err)
 	}
-	if loaded.Statuses[0].Name != "ws-only" {
-		t.Errorf("expected workspace-level spec, got %q", loaded.Statuses[0].Name)
+	if loaded.Spec.Statuses[0].Name != "ws-only" {
+		t.Errorf("expected workspace-level spec, got %q", loaded.Spec.Statuses[0].Name)
 	}
 }
 
@@ -185,8 +185,8 @@ func TestLoadWithFallbackGlobal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadWithFallback: %v", err)
 	}
-	if loaded.Statuses[0].Name != "closed" {
-		t.Errorf("expected global spec, got %q", loaded.Statuses[0].Name)
+	if loaded.Spec.Statuses[0].Name != "closed" {
+		t.Errorf("expected global spec, got %q", loaded.Spec.Statuses[0].Name)
 	}
 }
 

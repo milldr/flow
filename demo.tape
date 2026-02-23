@@ -34,9 +34,29 @@ Sleep 500ms
 
 Show
 
-# === flow init ===
+# === flow status (pre-existing workspaces) ===
 
 Sleep 500ms
+
+Type "flow status"
+Sleep 500ms
+Enter
+Sleep 4s
+
+# === flow exec ===
+
+Type "flow exec api-refactor -- ls"
+Sleep 500ms
+Enter
+Sleep 3s
+
+# === Clear and start creating a new workspace ===
+
+Type "clear"
+Enter
+Sleep 500ms
+
+# === flow init ===
 
 Type "flow init demo"
 Sleep 500ms
@@ -57,11 +77,11 @@ Sleep 500ms
 
 # Now in insert mode after "    repos: " — type the repo entry
 Enter
-Type@30ms "        - url: github.com/acme/app"
+Type@30ms "        - url: github.com/acme/web"
 Enter
-Type@30ms "          branch: feature/ipv6"
+Type@30ms "          branch: feat/dashboard"
 Enter
-Type@30ms "          path: app"
+Type@30ms "          path: web"
 Sleep 3s
 
 # Exit insert mode, save and quit
@@ -77,13 +97,6 @@ Type "flow render demo"
 Sleep 500ms
 Enter
 Sleep 5s
-
-# === flow exec ===
-
-Type "flow exec demo -- ls"
-Sleep 500ms
-Enter
-Sleep 3s
 
 # === flow list ===
 

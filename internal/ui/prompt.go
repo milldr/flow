@@ -35,6 +35,32 @@ func SelectWorkspace(matches []WorkspaceOption) (string, error) {
 	return selected, err
 }
 
+// AgentOption represents an agent choice for interactive selection.
+type AgentOption struct {
+	Name string
+	Exec string
+}
+
+// SelectAgent prompts the user to choose among multiple configured agents.
+// Returns the selected agent's exec command.
+func SelectAgent(agents []AgentOption) (string, error) {
+	options := make([]huh.Option[string], len(agents))
+	for i, a := range agents {
+		options[i] = huh.NewOption(a.Name, a.Exec)
+	}
+
+	var selected string
+	err := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Select an agent:").
+				Options(options...).
+				Value(&selected),
+		),
+	).Run()
+	return selected, err
+}
+
 // DeleteRepo holds repo display info for the delete confirmation prompt.
 type DeleteRepo struct {
 	Path   string

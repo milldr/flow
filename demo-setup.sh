@@ -4,6 +4,7 @@
 set -e
 
 export FLOW_HOME="/tmp/flow-demo/.flow"
+FLOW="$(pwd)/flow"
 rm -rf /tmp/flow-demo /tmp/demo
 mkdir -p /tmp/demo "$FLOW_HOME/workspaces" "$FLOW_HOME/repos"
 
@@ -27,16 +28,20 @@ create_repo() {
 create_repo "app" "feature/ipv6"   "main.go"   "add ipv6 support"
 create_repo "api" "feat/auth"      "main.go"   "add auth endpoints"
 create_repo "docs" "update/guides" "README.md" "update setup guide"
+create_repo "web" "feat/dashboard" "main.go"   "add dashboard page"
 
 # --- Pre-populate bare clone cache for realistic URLs ---
 
-for name in app api docs; do
+for name in app api docs web; do
   bare="$FLOW_HOME/repos/github.com/acme/${name}.git"
   mkdir -p "$(dirname "$bare")"
   git clone --bare "/tmp/demo/$name" "$bare" -q
+  # Add fetch refspec so worktrees can resolve origin/* refs
+  git -C "$bare" config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
+  git -C "$bare" fetch -q origin
 done
 
-# --- Create additional workspaces (the "demo" workspace is created by the init tape) ---
+# --- Create and render pre-existing workspaces ---
 
 create_workspace() {
   local id="$1" yaml="$2"
@@ -74,11 +79,45 @@ spec:
     - url: github.com/acme/app
       branch: feature/ipv6
       path: app
-    - url: github.com/acme/api
-      branch: feat/auth
-      path: api
-    - url: github.com/acme/docs
-      branch: update/guides
-      path: docs
 YAML
 )"
+
+# Render both workspaces so exec and status work
+$FLOW render bold-creek
+$FLOW render swift-pine
+
+# --- Add local commits so status checks detect diffs ---
+
+add_local_change() {
+  local ws_dir="$FLOW_HOME/workspaces/$1/$2"
+  git -C "$ws_dir" fetch -q origin 2>/dev/null || true
+  echo "# local change" >> "$ws_dir/README.md"
+  git -C "$ws_dir" add .
+  git -C "$ws_dir" commit -q -m "wip: local changes"
+}
+
+add_local_change "bold-creek" "api"
+add_local_change "bold-creek" "docs"
+add_local_change "swift-pine" "app"
+
+# --- Create a status spec that works with local repos ---
+# Uses git diff against origin to detect local changes (no gh needed).
+
+cat > "$FLOW_HOME/status.yaml" <<YAML
+apiVersion: flow/v1
+kind: Status
+spec:
+  statuses:
+    - name: closed
+      description: All PRs merged or closed
+      check: 'false'
+    - name: in-review
+      description: Non-draft PR open
+      check: 'false'
+    - name: in-progress
+      description: Local diffs or draft PR
+      check: git -C "$FLOW_HOME/workspaces/\$FLOW_WORKSPACE_ID/\$FLOW_REPO_PATH" diff --name-only "origin/\$FLOW_REPO_BRANCH" 2>/dev/null | grep -q .
+    - name: open
+      description: Workspace created, no changes yet
+      default: true
+YAML

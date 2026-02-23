@@ -14,16 +14,29 @@ The status spec defines how Flow resolves the status of each repo in a workspace
 ```yaml
 apiVersion: flow/v1
 kind: Status
-statuses:
-  - name: closed
-    description: PR merged
-    check: gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state merged --json number | jq -e 'length > 0' > /dev/null 2>&1
-  - name: in-review
-    description: PR open
-    check: gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state open --json number | jq -e 'length > 0' > /dev/null 2>&1
-  - name: in-progress
-    description: Active development
-    default: true
+spec:
+  statuses:
+    - name: closed
+      description: All PRs merged or closed
+      check: >-
+        gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state merged --json number
+        | jq -e 'length > 0' > /dev/null 2>&1
+        && gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state open --json number
+        | jq -e 'length == 0' > /dev/null 2>&1
+    - name: in-review
+      description: Non-draft PR open
+      check: >-
+        gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state open --json isDraft
+        | jq -e 'map(select(.isDraft == false)) | length > 0' > /dev/null 2>&1
+    - name: in-progress
+      description: Local diffs or draft PR
+      check: >-
+        git -C "$FLOW_REPO_PATH" diff --name-only "origin/$FLOW_REPO_BRANCH" 2>/dev/null | grep -q .
+        || gh pr list --repo "https://$FLOW_REPO_URL" --head "$FLOW_REPO_BRANCH" --state open --json isDraft
+        | jq -e 'map(select(.isDraft)) | length > 0' > /dev/null 2>&1
+    - name: open
+      description: Workspace created, no changes yet
+      default: true
 ```
 
 ## Fields
@@ -32,11 +45,11 @@ statuses:
 |-------|----------|-------------|
 | `apiVersion` | Yes | Must be `flow/v1` |
 | `kind` | Yes | Must be `Status` |
-| `statuses` | Yes | Must contain at least one entry |
-| `statuses[].name` | Yes | Unique status name |
-| `statuses[].description` | No | Human-readable description |
-| `statuses[].check` | Yes* | Shell command evaluated via `sh -c` (*not required for the default entry) |
-| `statuses[].default` | No | Exactly one entry must have `default: true` |
+| `spec.statuses[]` | Yes | Must contain at least one entry |
+| `spec.statuses[].name` | Yes | Unique status name |
+| `spec.statuses[].description` | No | Human-readable description |
+| `spec.statuses[].check` | Yes* | Shell command evaluated via `sh -c` (*not required for the default entry) |
+| `spec.statuses[].default` | No | Exactly one entry must have `default: true` |
 
 ## Environment Variables
 
