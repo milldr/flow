@@ -1,18 +1,18 @@
-## flow state
+## flow edit state
 
 Open workspace state file in editor
 
-![flow state](tapes/state.gif)
+![flow edit_state](tapes/edit_state.gif)
 
 
 ```
-flow state <workspace> [flags]
+flow edit state <workspace> [flags]
 ```
 
 ### Examples
 
 ```
-  flow state calm-delta    # Opens state.yaml in $EDITOR
+  flow edit state calm-delta    # Opens state.yaml in $EDITOR
 ```
 
 ### Options
@@ -29,5 +29,5 @@ flow state <workspace> [flags]
 
 ### SEE ALSO
 
-* [flow](flow.md)	 - Multi-repo workspace manager using git worktrees
+* [flow edit](flow_edit.md)	 - Open flow configuration files in editor
 

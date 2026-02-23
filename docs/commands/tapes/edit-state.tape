@@ -1,5 +1,5 @@
 # Regenerate: make docs
-Output docs/commands/tapes/state.gif
+Output docs/commands/tapes/edit_state.gif
 
 Set Shell "bash"
 Set FontFamily "Menlo"
@@ -35,7 +35,7 @@ Show
 
 Sleep 500ms
 
-Type "flow state demo"
+Type "flow edit state demo"
 Sleep 500ms
 Enter
 Sleep 1500ms

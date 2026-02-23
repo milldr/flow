@@ -43,9 +43,9 @@ Sleep 500ms
 Enter
 Sleep 3s
 
-# === flow state (add a repo in vim) ===
+# === flow edit state (add a repo in vim) ===
 
-Type "flow state demo"
+Type "flow edit state demo"
 Sleep 500ms
 Enter
 Sleep 1500ms

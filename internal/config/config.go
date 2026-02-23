@@ -9,12 +9,13 @@ import (
 
 // Config holds resolved paths for Flow's directory structure.
 type Config struct {
-	Home          string      // Root directory (~/.flow or $FLOW_HOME)
-	WorkspacesDir string      // ~/.flow/workspaces/
-	ReposDir      string      // ~/.flow/repos/
-	AgentsDir     string      // ~/.flow/agents/
-	ConfigFile    string      // ~/.flow/config.yaml
-	FlowConfig    *FlowConfig // loaded global config
+	Home           string      // Root directory (~/.flow or $FLOW_HOME)
+	WorkspacesDir  string      // ~/.flow/workspaces/
+	ReposDir       string      // ~/.flow/repos/
+	AgentsDir      string      // ~/.flow/agents/
+	ConfigFile     string      // ~/.flow/config.yaml
+	StatusSpecFile string      // ~/.flow/status.yaml
+	FlowConfig     *FlowConfig // loaded global config
 }
 
 // New creates a Config with resolved paths.
@@ -30,11 +31,12 @@ func New() (*Config, error) {
 	}
 
 	return &Config{
-		Home:          home,
-		WorkspacesDir: filepath.Join(home, "workspaces"),
-		ReposDir:      filepath.Join(home, "repos"),
-		AgentsDir:     filepath.Join(home, "agents"),
-		ConfigFile:    filepath.Join(home, "config.yaml"),
+		Home:           home,
+		WorkspacesDir:  filepath.Join(home, "workspaces"),
+		ReposDir:       filepath.Join(home, "repos"),
+		AgentsDir:      filepath.Join(home, "agents"),
+		ConfigFile:     filepath.Join(home, "config.yaml"),
+		StatusSpecFile: filepath.Join(home, "status.yaml"),
 	}, nil
 }
 
@@ -58,6 +60,11 @@ func (c *Config) BareRepoPath(repoURL string) string {
 // ClaudeAgentDir returns the path for the shared Claude agent directory.
 func (c *Config) ClaudeAgentDir() string {
 	return filepath.Join(c.AgentsDir, "claude")
+}
+
+// WorkspaceStatusSpecPath returns the status.yaml path for a workspace.
+func (c *Config) WorkspaceStatusSpecPath(id string) string {
+	return filepath.Join(c.WorkspacesDir, id, "status.yaml")
 }
 
 // EnsureDirs creates the top-level directories if they don't exist.

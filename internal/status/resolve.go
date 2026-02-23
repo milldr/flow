@@ -1,0 +1,124 @@
+package status
+
+import (
+	"context"
+	"os"
+	"os/exec"
+	"sync"
+	"time"
+)
+
+const checkTimeout = 10 * time.Second
+
+// CheckRunner executes a status check command and returns whether it matched.
+type CheckRunner interface {
+	RunCheck(ctx context.Context, command string, env []string) bool
+}
+
+// ShellRunner executes check commands via sh -c.
+type ShellRunner struct{}
+
+// RunCheck executes the command in a shell. Returns true if exit code is 0.
+func (r *ShellRunner) RunCheck(ctx context.Context, command string, env []string) bool {
+	ctx, cancel := context.WithTimeout(ctx, checkTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "sh", "-c", command)
+	cmd.Env = append(os.Environ(), env...)
+	return cmd.Run() == nil
+}
+
+// Resolver resolves workspace statuses using a CheckRunner.
+type Resolver struct {
+	Runner CheckRunner
+}
+
+// buildEnv creates the environment variables for a status check.
+func buildEnv(repo RepoInfo, wsID, wsName string) []string {
+	return []string{
+		"FLOW_REPO_URL=" + repo.URL,
+		"FLOW_REPO_BRANCH=" + repo.Branch,
+		"FLOW_REPO_PATH=" + repo.Path,
+		"FLOW_WORKSPACE_ID=" + wsID,
+		"FLOW_WORKSPACE_NAME=" + wsName,
+	}
+}
+
+// ResolveRepo determines the status of a single repo by evaluating checks
+// in order. Returns the name of the first matching status or the default.
+func (r *Resolver) ResolveRepo(ctx context.Context, spec *Spec, repo RepoInfo, wsID, wsName string) string {
+	env := buildEnv(repo, wsID, wsName)
+
+	for _, entry := range spec.Statuses {
+		if entry.Default {
+			return entry.Name
+		}
+		if r.Runner.RunCheck(ctx, entry.Check, env) {
+			return entry.Name
+		}
+	}
+
+	return ""
+}
+
+// ResolveWorkspace resolves the status for each repo concurrently and
+// returns the aggregated workspace result. The workspace status is the
+// least-advanced status (highest index in spec order) across all repos.
+func (r *Resolver) ResolveWorkspace(ctx context.Context, spec *Spec, repos []RepoInfo, wsID, wsName string) *WorkspaceResult {
+	result := &WorkspaceResult{
+		WorkspaceID:   wsID,
+		WorkspaceName: wsName,
+		Repos:         make([]RepoResult, len(repos)),
+	}
+
+	if len(repos) == 0 {
+		// No repos — use the default status.
+		for _, e := range spec.Statuses {
+			if e.Default {
+				result.Status = e.Name
+				break
+			}
+		}
+		return result
+	}
+
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for i, repo := range repos {
+		wg.Add(1)
+		go func(idx int, rp RepoInfo) {
+			defer wg.Done()
+			status := r.ResolveRepo(ctx, spec, rp, wsID, wsName)
+			mu.Lock()
+			result.Repos[idx] = RepoResult{
+				URL:    rp.URL,
+				Branch: rp.Branch,
+				Status: status,
+			}
+			mu.Unlock()
+		}(i, repo)
+	}
+
+	wg.Wait()
+
+	// Build index map for ordering.
+	orderIndex := make(map[string]int, len(spec.Statuses))
+	for i, e := range spec.Statuses {
+		orderIndex[e.Name] = i
+	}
+
+	// Workspace status = least advanced (highest index) across repos.
+	worstIdx := -1
+	for _, rr := range result.Repos {
+		idx, ok := orderIndex[rr.Status]
+		if ok && idx > worstIdx {
+			worstIdx = idx
+		}
+	}
+	if worstIdx >= 0 {
+		result.Status = spec.Statuses[worstIdx].Name
+	}
+
+	return result
+}
