@@ -47,16 +47,6 @@ flow edit config    # Opens ~/.flow/config.yaml in $EDITOR
 
 **Breaking change:** `flow state` is removed. Use `flow edit state` instead. This is acceptable since flow is pre-release.
 
-## Files
-
-| File | Action |
-|------|--------|
-| `docs/prd/007-edit-command.md` | Created — this PRD |
-| `docs/prd/README.md` | Modified — add PRD-007 row |
-| `internal/cmd/edit.go` | Modified — add `state` and `config` subcommands (parent created in PRD-006) |
-| `internal/cmd/state.go` | Deleted — replaced by `flow edit state` in `edit.go` |
-| `internal/cmd/root.go` | Modified — remove `flow state`, register `flow edit` parent |
-
 ## Acceptance Criteria
 
 - [ ] `flow edit state <workspace>` opens state file in editor

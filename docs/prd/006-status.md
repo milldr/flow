@@ -250,21 +250,6 @@ These are design choices to confirm before implementation:
 
 2. **Check timeout configurability?** Could add a `timeout` field per status or globally in the spec. Recommendation: Hardcode 10s for MVP, make configurable later.
 
-## Files
-
-| File | Action |
-|------|--------|
-| `docs/prd/006-status.md` | Created — this PRD |
-| `docs/prd/README.md` | Modified — add PRD-006 row |
-| `internal/status/` | Created — new package for status spec types, loading, resolution |
-| `internal/status/types.go` | Created — `StatusSpec`, `Status` types |
-| `internal/status/spec.go` | Created — Load, Validate, default spec generation |
-| `internal/status/resolve.go` | Created — Check execution, per-repo resolution, workspace aggregation |
-| `internal/status/resolve_test.go` | Created — Tests with mock checks |
-| `internal/cmd/status.go` | Created — `flow status` command definition |
-| `internal/cmd/edit.go` | Created — `flow edit` parent command with `status` subcommand |
-| `internal/config/config.go` | Modified — add `StatusSpecFile` path field |
-
 ## Acceptance Criteria
 
 - [ ] `flow status --init` creates a starter `~/.flow/status.yaml` and opens in editor
