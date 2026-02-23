@@ -28,6 +28,11 @@ Type `export EDITOR="vim -u NONE"`
 Enter
 Sleep 200ms
 
+# Swap in local-only status spec (no gh needed for demo)
+Type `cp "$FLOW_HOME/status-local.yaml" "$FLOW_HOME/status.yaml"`
+Enter
+Sleep 200ms
+
 Type "clear"
 Enter
 Sleep 500ms

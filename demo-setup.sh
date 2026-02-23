@@ -100,10 +100,13 @@ add_local_change "bold-creek" "api"
 add_local_change "bold-creek" "docs"
 add_local_change "swift-pine" "app"
 
-# --- Create a status spec that works with local repos ---
-# Uses git diff against origin to detect local changes (no gh needed).
+# --- Create status specs ---
+# The default spec (written by EnsureDirs on first flow command) uses gh + jq.
+# For the demo, we keep the default for the edit-status tape (so it shows the
+# real commands), then the status tape swaps in a local-only spec before running.
 
-cat > "$FLOW_HOME/status.yaml" <<YAML
+# Write a local-only spec that the status tape will swap in (no gh needed).
+cat > "$FLOW_HOME/status-local.yaml" <<YAML
 apiVersion: flow/v1
 kind: Status
 spec:
