@@ -98,10 +98,20 @@ Flow stores everything under `~/.flow` (override with `$FLOW_HOME`):
 ~/.flow/
 ├── config.yaml                         # Global config
 ├── status.yaml                         # Global status spec
+├── agents/
+│   └── claude/
+│       ├── CLAUDE.md                   # Shared agent instructions
+│       └── skills/
+│           ├── flow-cli/SKILL.md       # Flow CLI skill
+│           └── workspace-structure/SKILL.md
 ├── workspaces/
 │   └── calm-delta/                     # Workspace ID
 │       ├── state.yaml                  # Workspace manifest (name: vpc-ipv6)
 │       ├── status.yaml                 # Optional workspace-specific status spec
+│       ├── CLAUDE.md                   # Generated workspace context
+│       ├── .claude/
+│       │   ├── CLAUDE.md → agents/claude/CLAUDE.md
+│       │   └── skills → agents/claude/skills/
 │       ├── vpc-service/                # Worktree
 │       └── subnet-manager/             # Worktree
 └── repos/
@@ -111,6 +121,8 @@ Flow stores everything under `~/.flow` (override with `$FLOW_HOME`):
 ```
 
 Bare clones are shared across workspaces. Worktrees are cheap — they share the object store with the bare clone, so multiple workspaces pointing at the same repo don't duplicate data.
+
+See the [spec reference](docs/specs/) for YAML file schemas and the [command reference](docs/commands/) for usage, flags, and GIF demos.
 
 ## Requirements
 
