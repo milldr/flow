@@ -21,14 +21,12 @@ flow status [workspace] [flags]
 ```
   flow status                  # Show all workspace statuses
   flow status vpc-ipv6          # Show per-repo breakdown
-  flow status --init            # Create starter status spec
 ```
 
 ### Options
 
 ```
   -h, --help   help for status
-      --init   Create a starter status spec file
 ```
 
 ### Options inherited from parent commands

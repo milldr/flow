@@ -67,6 +67,22 @@ type DeleteRepo struct {
 	Branch string
 }
 
+// ConfirmReset prompts the user to confirm resetting a file to its default value.
+func ConfirmReset(filePath string) (bool, error) {
+	Warning("This will hard reset " + filePath + " to its default value")
+	Print("")
+
+	var confirm bool
+	err := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Confirm?").
+				Value(&confirm),
+		),
+	).Run()
+	return confirm, err
+}
+
 // ConfirmDelete prompts the user to confirm workspace deletion.
 func ConfirmDelete(name, id string, repos []DeleteRepo) (bool, error) {
 	title := fmt.Sprintf("Delete workspace '%s'", name)

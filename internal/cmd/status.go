@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
 	"path/filepath"
 
 	"github.com/milldr/flow/internal/config"
@@ -16,8 +15,6 @@ import (
 )
 
 func newStatusCmd(svc *workspace.Service, cfg *config.Config) *cobra.Command {
-	var initFlag bool
-
 	cmd := &cobra.Command{
 		Use:   "status [workspace]",
 		Short: "Show workspace status",
@@ -26,12 +23,8 @@ func newStatusCmd(svc *workspace.Service, cfg *config.Config) *cobra.Command {
 Without arguments, shows all workspaces with their statuses.
 With a workspace argument, shows a detailed per-repo status breakdown.`,
 		Args:    cobra.MaximumNArgs(1),
-		Example: "  flow status                  # Show all workspace statuses\n  flow status vpc-ipv6          # Show per-repo breakdown\n  flow status --init            # Create starter status spec",
+		Example: "  flow status                  # Show all workspace statuses\n  flow status vpc-ipv6          # Show per-repo breakdown",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if initFlag {
-				return runStatusInit(cfg)
-			}
-
 			if len(args) == 0 {
 				return runStatusAll(cmd.Context(), svc, cfg)
 			}
@@ -39,20 +32,7 @@ With a workspace argument, shows a detailed per-repo status breakdown.`,
 		},
 	}
 
-	cmd.Flags().BoolVar(&initFlag, "init", false, "Create a starter status spec file")
-
 	return cmd
-}
-
-func runStatusInit(cfg *config.Config) error {
-	path := cfg.StatusSpecFile
-
-	if err := status.Save(path, status.DefaultSpec()); err != nil {
-		return fmt.Errorf("creating status spec: %w", err)
-	}
-
-	ui.Success("Created status spec at " + path)
-	return openInEditor(path)
 }
 
 func runStatusAll(ctx context.Context, svc *workspace.Service, cfg *config.Config) error {
@@ -109,7 +89,7 @@ func runStatusAll(ctx context.Context, svc *workspace.Service, cfg *config.Confi
 	})
 	if err != nil {
 		if errors.Is(err, status.ErrSpecNotFound) {
-			ui.Print("No status spec found. Run " + ui.Code("flow status --init") + " to create one.")
+			ui.Print("No status spec found. Run " + ui.Code("flow reset status") + " to create one.")
 			return nil
 		}
 		return err
@@ -146,7 +126,7 @@ func runStatusWorkspace(ctx context.Context, svc *workspace.Service, cfg *config
 	)
 	if err != nil {
 		if errors.Is(err, status.ErrSpecNotFound) {
-			ui.Print("No status spec found. Run " + ui.Code("flow status --init") + " to create one.")
+			ui.Print("No status spec found. Run " + ui.Code("flow reset status") + " to create one.")
 			return nil
 		}
 		return err
