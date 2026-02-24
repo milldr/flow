@@ -51,7 +51,7 @@ func newInitCmd(svc *workspace.Service) *cobra.Command {
 			if name != "" {
 				ref = name
 			}
-			ui.Printf("\n  Next: %s\n", ui.Code("flow state "+ref))
+			ui.Printf("\n  Next: %s\n", ui.Code("flow edit state "+ref))
 
 			return nil
 		},
