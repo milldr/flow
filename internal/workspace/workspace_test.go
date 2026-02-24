@@ -635,6 +635,57 @@ func TestGenerateUniqueIDAvoidsExisting(t *testing.T) {
 	}
 }
 
+func TestCreateSetsUpClaudeFiles(t *testing.T) {
+	svc, _ := testService(t)
+
+	st := state.NewState("create-claude", "Test Claude setup on create", []state.Repo{
+		{URL: "github.com/org/repo-a", Branch: "main", Path: "./repo-a"},
+		{URL: "github.com/org/repo-b", Branch: "feat/x", Path: "./repo-b"},
+	})
+
+	if err := svc.Create("create-claude-ws", st); err != nil {
+		t.Fatal(err)
+	}
+
+	wsDir := svc.Config.WorkspacePath("create-claude-ws")
+
+	// Workspace CLAUDE.md should exist with repo info
+	data, err := os.ReadFile(filepath.Join(wsDir, "CLAUDE.md"))
+	if err != nil {
+		t.Fatal("workspace CLAUDE.md not created by Create()")
+	}
+	content := string(data)
+	if !strings.Contains(content, "create-claude") {
+		t.Error("workspace CLAUDE.md missing name")
+	}
+	if !strings.Contains(content, "repo-a") {
+		t.Error("workspace CLAUDE.md missing repo-a")
+	}
+	if !strings.Contains(content, "repo-b") {
+		t.Error("workspace CLAUDE.md missing repo-b")
+	}
+
+	// .claude/CLAUDE.md should be a symlink to shared
+	target, err := os.Readlink(filepath.Join(wsDir, ".claude", "CLAUDE.md"))
+	if err != nil {
+		t.Fatal(".claude/CLAUDE.md symlink not created by Create()")
+	}
+	expected := filepath.Join(svc.Config.AgentsDir, "claude", "CLAUDE.md")
+	if target != expected {
+		t.Errorf(".claude/CLAUDE.md target = %q, want %q", target, expected)
+	}
+
+	// .claude/skills should be a symlink to shared
+	target, err = os.Readlink(filepath.Join(wsDir, ".claude", "skills"))
+	if err != nil {
+		t.Fatal(".claude/skills symlink not created by Create()")
+	}
+	expected = filepath.Join(svc.Config.AgentsDir, "claude", "skills")
+	if target != expected {
+		t.Errorf(".claude/skills target = %q, want %q", target, expected)
+	}
+}
+
 func TestRenderCreatesClaudeFiles(t *testing.T) {
 	svc, _ := testService(t)
 	ctx := context.Background()

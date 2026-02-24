@@ -72,7 +72,16 @@ func (s *Service) Create(id string, st *state.State) error {
 		return err
 	}
 
-	return state.Save(s.Config.StatePath(id), st)
+	if err := state.Save(s.Config.StatePath(id), st); err != nil {
+		return err
+	}
+
+	// Set up Claude agent files immediately so skills are available before render
+	if err := agents.SetupWorkspaceClaude(wsDir, s.Config.AgentsDir, st, id); err != nil {
+		return fmt.Errorf("setting up claude files: %w", err)
+	}
+
+	return nil
 }
 
 // List returns info for all workspaces.
