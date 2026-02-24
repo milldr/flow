@@ -42,6 +42,37 @@ func EnsureSharedAgent(agentsDir string) error {
 	return nil
 }
 
+// ResetSharedAgent overwrites the shared Claude agent files with their defaults,
+// regardless of whether they already exist.
+func ResetSharedAgent(agentsDir string) error {
+	claudeDir := filepath.Join(agentsDir, "claude")
+	flowCLIDir := filepath.Join(claudeDir, "skills", "flow-cli")
+	wsStructDir := filepath.Join(claudeDir, "skills", "workspace-structure")
+
+	for _, dir := range []string{flowCLIDir, wsStructDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+	}
+
+	defaults := []struct {
+		path    string
+		content []byte
+	}{
+		{filepath.Join(claudeDir, "CLAUDE.md"), defaultClaudeMD},
+		{filepath.Join(flowCLIDir, "SKILL.md"), defaultFlowCLI},
+		{filepath.Join(wsStructDir, "SKILL.md"), defaultWorkspaceStructure},
+	}
+
+	for _, d := range defaults {
+		if err := os.WriteFile(d.path, d.content, 0o644); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // SetupWorkspaceClaude generates workspace-specific Claude files and creates
 // symlinks to the shared agent directory.
 func SetupWorkspaceClaude(wsDir, agentsDir string, st *state.State, id string) error {
@@ -111,7 +142,7 @@ func generateWorkspaceClaude(st *state.State, id string) string {
 	}
 
 	b.WriteString("\n## Quick Reference\n\n")
-	b.WriteString(fmt.Sprintf("- View state: `flow state %s`\n", id))
+	b.WriteString(fmt.Sprintf("- Edit state: `flow edit state %s`\n", id))
 	b.WriteString(fmt.Sprintf("- Re-render: `flow render %s`\n", id))
 	b.WriteString(fmt.Sprintf("- Run command: `flow exec %s -- <cmd>`\n", id))
 

@@ -46,5 +46,6 @@ vhs: build
 	vhs docs/commands/tapes/reset-status.tape
 	vhs docs/commands/tapes/reset-config.tape
 	vhs docs/commands/tapes/reset-state.tape
+	vhs docs/commands/tapes/reset-skills.tape
 
 docs: gendocs vhs

@@ -22,6 +22,7 @@ Reset status, config, or state files to their default values.
 
 * [flow](flow.md)	 - Multi-repo workspace manager using git worktrees
 * [flow reset config](flow_reset_config.md)	 - Reset the global config to its default
+* [flow reset skills](flow_reset_skills.md)	 - Reset shared agent skills to their defaults
 * [flow reset state](flow_reset_state.md)	 - Reset a workspace state file to its default
 * [flow reset status](flow_reset_status.md)	 - Reset the global status spec to its default
 

@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/milldr/flow/internal/agents"
 	"github.com/milldr/flow/internal/config"
 	"github.com/milldr/flow/internal/state"
 	"github.com/milldr/flow/internal/status"
@@ -21,6 +22,7 @@ func newResetCmd(svc *workspace.Service, cfg *config.Config) *cobra.Command {
 	cmd.AddCommand(newResetStatusCmd(cfg))
 	cmd.AddCommand(newResetConfigCmd(cfg))
 	cmd.AddCommand(newResetStateCmd(svc, cfg))
+	cmd.AddCommand(newResetSkillsCmd(cfg))
 
 	return cmd
 }
@@ -126,6 +128,40 @@ func newResetStateCmd(svc *workspace.Service, cfg *config.Config) *cobra.Command
 			}
 
 			ui.Success("Reset state at " + path)
+			return nil
+		},
+	}
+
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "Skip confirmation prompt")
+	return cmd
+}
+
+func newResetSkillsCmd(cfg *config.Config) *cobra.Command {
+	var force bool
+
+	cmd := &cobra.Command{
+		Use:     "skills",
+		Short:   "Reset shared agent skills to their defaults",
+		Example: "  flow reset skills\n  flow reset skills --force",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			path := cfg.AgentsDir
+
+			if !force {
+				confirmed, err := ui.ConfirmReset(path)
+				if err != nil {
+					return err
+				}
+				if !confirmed {
+					ui.Print("Cancelled.")
+					return nil
+				}
+			}
+
+			if err := agents.ResetSharedAgent(path); err != nil {
+				return fmt.Errorf("resetting skills: %w", err)
+			}
+
+			ui.Success("Reset shared agent skills at " + path)
 			return nil
 		},
 	}
