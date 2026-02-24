@@ -23,6 +23,10 @@ Type `export PATH="$(pwd):$PATH"`
 Enter
 Sleep 200ms
 
+Type `export SHELL=/bin/bash`
+Enter
+Sleep 200ms
+
 Type "clear"
 Enter
 Sleep 500ms
