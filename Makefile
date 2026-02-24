@@ -41,6 +41,7 @@ vhs: build
 	vhs docs/commands/tapes/edit-status.tape
 	vhs docs/commands/tapes/status.tape
 	vhs docs/commands/tapes/edit-config.tape
+	vhs docs/commands/tapes/open.tape
 	vhs docs/commands/tapes/delete.tape
 	vhs docs/commands/tapes/reset-status.tape
 	vhs docs/commands/tapes/reset-config.tape

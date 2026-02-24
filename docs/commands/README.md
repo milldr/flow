@@ -9,6 +9,7 @@ Auto-generated CLI reference with GIF demos. See [flow.md](flow.md) for the comm
 | [flow edit](flow_edit.md) | Edit flow configuration files |
 | [flow render](flow_render.md) | Create worktrees from workspace state file |
 | [flow exec](flow_exec.md) | Run a command from the workspace directory |
+| [flow open](flow_open.md) | Print the workspace directory path |
 | [flow status](flow_status.md) | Show workspace status |
 | [flow reset](flow_reset.md) | Reset a config file to its default value |
 | [flow delete](flow_delete.md) | Delete a workspace and its worktrees |
