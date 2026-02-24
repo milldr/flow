@@ -1,24 +1,24 @@
-## flow state
+## flow open
 
-Open workspace state file in editor
+Open a shell in the workspace directory
 
-![flow state](tapes/state.gif)
+![flow open](tapes/open.gif)
 
 
 ```
-flow state <workspace> [flags]
+flow open <workspace> [flags]
 ```
 
 ### Examples
 
 ```
-  flow state calm-delta    # Opens state.yaml in $EDITOR
+  flow open calm-delta
 ```
 
 ### Options
 
 ```
-  -h, --help   help for state
+  -h, --help   help for open
 ```
 
 ### Options inherited from parent commands

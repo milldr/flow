@@ -11,11 +11,16 @@ user-invocable: false
 | Command | Description |
 |---------|-------------|
 | `flow list` | List all workspaces |
-| `flow state <workspace>` | Show workspace state (YAML manifest) |
+| `flow edit state <workspace>` | Open workspace state file in editor |
 | `flow render <workspace>` | Clone repos and check out branches (creates worktrees) |
+| `flow open <workspace>` | Open a shell in the workspace directory |
 | `flow exec <workspace> -- <cmd>` | Run a command inside the workspace directory |
 | `flow init <workspace>` | Create a new workspace interactively |
 | `flow delete <workspace>` | Delete a workspace and its worktrees |
+| `flow reset status` | Reset global status spec to default |
+| `flow reset config` | Reset global config to default |
+| `flow reset state <workspace>` | Reset workspace state to default (preserves name/description) |
+| `flow reset skills` | Reset shared agent skills to their defaults |
 
 ## State File Format
 

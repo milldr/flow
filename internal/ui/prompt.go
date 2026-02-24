@@ -35,10 +35,52 @@ func SelectWorkspace(matches []WorkspaceOption) (string, error) {
 	return selected, err
 }
 
+// AgentOption represents an agent choice for interactive selection.
+type AgentOption struct {
+	Name string
+	Exec string
+}
+
+// SelectAgent prompts the user to choose among multiple configured agents.
+// Returns the selected agent's exec command.
+func SelectAgent(agents []AgentOption) (string, error) {
+	options := make([]huh.Option[string], len(agents))
+	for i, a := range agents {
+		options[i] = huh.NewOption(a.Name, a.Exec)
+	}
+
+	var selected string
+	err := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Select an agent:").
+				Options(options...).
+				Value(&selected),
+		),
+	).Run()
+	return selected, err
+}
+
 // DeleteRepo holds repo display info for the delete confirmation prompt.
 type DeleteRepo struct {
 	Path   string
 	Branch string
+}
+
+// ConfirmReset prompts the user to confirm resetting a file to its default value.
+func ConfirmReset(filePath string) (bool, error) {
+	Warning("This will hard reset " + filePath + " to its default value")
+	Print("")
+
+	var confirm bool
+	err := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Confirm?").
+				Value(&confirm),
+		),
+	).Run()
+	return confirm, err
 }
 
 // ConfirmDelete prompts the user to confirm workspace deletion.

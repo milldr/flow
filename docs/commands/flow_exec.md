@@ -6,15 +6,15 @@ Run a command from the workspace directory
 
 
 ```
-flow exec <workspace> -- <command> [flags]
+flow exec <workspace> [-- <command>] [flags]
 ```
 
 ### Examples
 
 ```
+  flow exec calm-delta
   flow exec calm-delta -- cursor .
   flow exec calm-delta -- git status
-  flow exec calm-delta -- ls -la
 ```
 
 ### Options

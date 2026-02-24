@@ -14,6 +14,19 @@ func TestDefaultFlowConfig(t *testing.T) {
 	if fc.Kind != "Config" {
 		t.Errorf("Kind = %q, want Config", fc.Kind)
 	}
+	if len(fc.Spec.Agents) != 1 {
+		t.Fatalf("Spec.Agents length = %d, want 1", len(fc.Spec.Agents))
+	}
+	agent := fc.DefaultAgent()
+	if agent == nil {
+		t.Fatal("DefaultAgent() should not be nil for default config")
+	}
+	if agent.Name != "claude" {
+		t.Errorf("DefaultAgent().Name = %q, want %q", agent.Name, "claude")
+	}
+	if agent.Exec != "claude" {
+		t.Errorf("DefaultAgent().Exec = %q, want %q", agent.Exec, "claude")
+	}
 }
 
 func TestFlowConfigRoundTrip(t *testing.T) {
@@ -35,6 +48,46 @@ func TestFlowConfigRoundTrip(t *testing.T) {
 	}
 	if loaded.Kind != fc.Kind {
 		t.Errorf("Kind = %q, want %q", loaded.Kind, fc.Kind)
+	}
+}
+
+func TestFlowConfigAgentsRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	fc := DefaultFlowConfig()
+	fc.Spec.Agents = []Agent{
+		{Name: "claude", Exec: "claude", Default: true},
+		{Name: "cursor", Exec: "cursor ."},
+	}
+	if err := SaveFlowConfig(path, fc); err != nil {
+		t.Fatalf("SaveFlowConfig: %v", err)
+	}
+
+	loaded, err := LoadFlowConfig(path)
+	if err != nil {
+		t.Fatalf("LoadFlowConfig: %v", err)
+	}
+
+	if len(loaded.Spec.Agents) != 2 {
+		t.Fatalf("Spec.Agents length = %d, want 2", len(loaded.Spec.Agents))
+	}
+	agent := loaded.DefaultAgent()
+	if agent == nil {
+		t.Fatal("DefaultAgent() returned nil")
+	}
+	if agent.Exec != "claude" {
+		t.Errorf("DefaultAgent().Exec = %q, want %q", agent.Exec, "claude")
+	}
+}
+
+func TestDefaultAgentNoDefault(t *testing.T) {
+	fc := DefaultFlowConfig()
+	fc.Spec.Agents = []Agent{
+		{Name: "claude", Exec: "claude"},
+	}
+	if fc.DefaultAgent() != nil {
+		t.Error("DefaultAgent() should be nil when no agent is marked default")
 	}
 }
 

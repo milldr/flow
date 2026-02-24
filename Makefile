@@ -34,10 +34,18 @@ gendocs:
 vhs: build
 	bash demo-setup.sh
 	vhs docs/commands/tapes/init.tape
-	vhs docs/commands/tapes/state.tape
+	vhs docs/commands/tapes/edit-state.tape
 	vhs docs/commands/tapes/render.tape
 	vhs docs/commands/tapes/exec.tape
 	vhs docs/commands/tapes/list.tape
+	vhs docs/commands/tapes/edit-status.tape
+	vhs docs/commands/tapes/status.tape
+	vhs docs/commands/tapes/edit-config.tape
+	vhs docs/commands/tapes/open.tape
 	vhs docs/commands/tapes/delete.tape
+	vhs docs/commands/tapes/reset-status.tape
+	vhs docs/commands/tapes/reset-config.tape
+	vhs docs/commands/tapes/reset-state.tape
+	vhs docs/commands/tapes/reset-skills.tape
 
 docs: gendocs vhs

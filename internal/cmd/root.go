@@ -89,9 +89,12 @@ func newRootCmd() *cobra.Command {
 	root.AddCommand(newInitCmd(svc))
 	root.AddCommand(newListCmd(svc))
 	root.AddCommand(newRenderCmd(svc))
-	root.AddCommand(newStateCmd(svc))
+	root.AddCommand(newEditCmd(svc, cfg))
+	root.AddCommand(newStatusCmd(svc, cfg))
 	root.AddCommand(newExecCmd(svc))
+	root.AddCommand(newOpenCmd(svc))
 	root.AddCommand(newDeleteCmd(svc))
+	root.AddCommand(newResetCmd(svc, cfg))
 
 	return root
 }

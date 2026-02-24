@@ -96,11 +96,12 @@ func TestClaudeAgentDir(t *testing.T) {
 func TestEnsureDirs(t *testing.T) {
 	dir := t.TempDir()
 	cfg := &Config{
-		Home:          dir,
-		WorkspacesDir: filepath.Join(dir, "workspaces"),
-		ReposDir:      filepath.Join(dir, "repos"),
-		AgentsDir:     filepath.Join(dir, "agents"),
-		ConfigFile:    filepath.Join(dir, "config.yaml"),
+		Home:           dir,
+		WorkspacesDir:  filepath.Join(dir, "workspaces"),
+		ReposDir:       filepath.Join(dir, "repos"),
+		AgentsDir:      filepath.Join(dir, "agents"),
+		ConfigFile:     filepath.Join(dir, "config.yaml"),
+		StatusSpecFile: filepath.Join(dir, "status.yaml"),
 	}
 
 	if err := cfg.EnsureDirs(); err != nil {
@@ -121,6 +122,11 @@ func TestEnsureDirs(t *testing.T) {
 		t.Errorf("config file not created: %v", err)
 	}
 
+	// Status spec file should be created
+	if _, err := os.Stat(cfg.StatusSpecFile); err != nil {
+		t.Errorf("status spec file not created: %v", err)
+	}
+
 	// FlowConfig should be loaded
 	if cfg.FlowConfig == nil {
 		t.Fatal("FlowConfig not loaded")
@@ -138,11 +144,12 @@ func TestEnsureDirs(t *testing.T) {
 func TestEnsureDirsLoadsExistingConfig(t *testing.T) {
 	dir := t.TempDir()
 	cfg := &Config{
-		Home:          dir,
-		WorkspacesDir: filepath.Join(dir, "workspaces"),
-		ReposDir:      filepath.Join(dir, "repos"),
-		AgentsDir:     filepath.Join(dir, "agents"),
-		ConfigFile:    filepath.Join(dir, "config.yaml"),
+		Home:           dir,
+		WorkspacesDir:  filepath.Join(dir, "workspaces"),
+		ReposDir:       filepath.Join(dir, "repos"),
+		AgentsDir:      filepath.Join(dir, "agents"),
+		ConfigFile:     filepath.Join(dir, "config.yaml"),
+		StatusSpecFile: filepath.Join(dir, "status.yaml"),
 	}
 
 	// Pre-create a config file
