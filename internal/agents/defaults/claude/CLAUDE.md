@@ -6,6 +6,10 @@ You are working inside a **flow workspace** — a multi-repo development environ
 
 Flow manages multi-repo development workspaces using git worktrees. A YAML manifest (`state.yaml`) defines which repos and branches belong together, and `flow render` materializes the workspace by cloning repos and creating worktrees.
 
+## Getting Started
+
+If this is a fresh workspace with no repos yet, the user will give you a task — possibly pasted from Slack, dictated, or described in plain language. Use the **Task Initialization** section in the `flow-cli` skill to set the workspace name, description, add repos, render, and start working. You have everything you need to bootstrap the workspace yourself.
+
 ## How this workspace is structured
 
 Each workspace directory contains:
