@@ -34,9 +34,9 @@ type Resolver struct {
 	Runner CheckRunner
 }
 
-// repoSlug converts a repo URL to owner/repo format for gh CLI.
+// RepoSlug converts a repo URL to owner/repo format for gh CLI.
 // Handles SSH (git@github.com:org/repo.git) and HTTPS (github.com/org/repo) URLs.
-func repoSlug(url string) string {
+func RepoSlug(url string) string {
 	s := url
 	// SSH: git@github.com:org/repo.git -> org/repo.git
 	if i := strings.Index(s, ":"); strings.Contains(s, "@") && i > 0 {
@@ -57,7 +57,7 @@ func buildEnv(repo RepoInfo, wsID, wsName string) []string {
 		"FLOW_REPO_URL=" + repo.URL,
 		"FLOW_REPO_BRANCH=" + repo.Branch,
 		"FLOW_REPO_PATH=" + repo.Path,
-		"FLOW_REPO_SLUG=" + repoSlug(repo.URL),
+		"FLOW_REPO_SLUG=" + RepoSlug(repo.URL),
 		"FLOW_WORKSPACE_ID=" + wsID,
 		"FLOW_WORKSPACE_NAME=" + wsName,
 	}
@@ -84,6 +84,7 @@ func (r *Resolver) ResolveRepo(ctx context.Context, spec *Spec, repo RepoInfo, w
 // returns the aggregated workspace result. The workspace status is the
 // least-advanced status (highest index in spec order) across all repos.
 func (r *Resolver) ResolveWorkspace(ctx context.Context, spec *Spec, repos []RepoInfo, wsID, wsName string) *WorkspaceResult {
+	wsStart := time.Now()
 	result := &WorkspaceResult{
 		WorkspaceID:   wsID,
 		WorkspaceName: wsName,
@@ -98,6 +99,7 @@ func (r *Resolver) ResolveWorkspace(ctx context.Context, spec *Spec, repos []Rep
 				break
 			}
 		}
+		result.Duration = time.Since(wsStart)
 		return result
 	}
 
@@ -108,18 +110,21 @@ func (r *Resolver) ResolveWorkspace(ctx context.Context, spec *Spec, repos []Rep
 		wg.Add(1)
 		go func(idx int, rp RepoInfo) {
 			defer wg.Done()
+			repoStart := time.Now()
 			status := r.ResolveRepo(ctx, spec, rp, wsID, wsName)
 			mu.Lock()
 			result.Repos[idx] = RepoResult{
-				URL:    rp.URL,
-				Branch: rp.Branch,
-				Status: status,
+				URL:      rp.URL,
+				Branch:   rp.Branch,
+				Status:   status,
+				Duration: time.Since(repoStart),
 			}
 			mu.Unlock()
 		}(i, repo)
 	}
 
 	wg.Wait()
+	result.Duration = time.Since(wsStart)
 
 	// Build index map for ordering.
 	orderIndex := make(map[string]int, len(spec.Spec.Statuses))

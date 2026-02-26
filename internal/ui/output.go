@@ -57,6 +57,22 @@ func Printf(format string, a ...any) {
 	fmt.Printf(format, a...)
 }
 
+// StatusStyle returns the status string with color applied based on its value.
+func StatusStyle(status string) string {
+	switch status {
+	case "closed":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Render(status)
+	case "in-review":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render(status)
+	case "in-progress":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Render(status)
+	case "open":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render(status)
+	default:
+		return status
+	}
+}
+
 // Truncate shortens a string to maxLen characters, appending "..." if needed.
 func Truncate(s string, maxLen int) string {
 	if maxLen < 4 {

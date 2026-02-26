@@ -187,9 +187,9 @@ func TestRepoSlug(t *testing.T) {
 		{"git@gitlab.com:deep/nested/repo.git", "deep/nested/repo"},
 	}
 	for _, tt := range tests {
-		got := repoSlug(tt.url)
+		got := RepoSlug(tt.url)
 		if got != tt.want {
-			t.Errorf("repoSlug(%q) = %q, want %q", tt.url, got, tt.want)
+			t.Errorf("RepoSlug(%q) = %q, want %q", tt.url, got, tt.want)
 		}
 	}
 }

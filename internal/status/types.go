@@ -1,6 +1,8 @@
 // Package status handles status spec loading, validation, and resolution.
 package status
 
+import "time"
+
 // SpecBody holds the statuses list nested under spec.
 type SpecBody struct {
 	Statuses []Entry `yaml:"statuses,omitempty"`
@@ -30,9 +32,10 @@ type RepoInfo struct {
 
 // RepoResult holds the resolved status for a single repo.
 type RepoResult struct {
-	URL    string
-	Branch string
-	Status string
+	URL      string
+	Branch   string
+	Status   string
+	Duration time.Duration
 }
 
 // WorkspaceResult holds the resolved status for a workspace.
@@ -40,5 +43,6 @@ type WorkspaceResult struct {
 	WorkspaceID   string
 	WorkspaceName string
 	Status        string
+	Duration      time.Duration
 	Repos         []RepoResult
 }
