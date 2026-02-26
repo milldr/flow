@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sync"
 
 	"github.com/milldr/flow/internal/config"
 	"github.com/milldr/flow/internal/state"
@@ -12,6 +13,7 @@ import (
 	"github.com/milldr/flow/internal/ui"
 	"github.com/milldr/flow/internal/workspace"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 func newStatusCmd(svc *workspace.Service, cfg *config.Config) *cobra.Command {
@@ -46,72 +48,69 @@ func runStatusAll(ctx context.Context, svc *workspace.Service, cfg *config.Confi
 		return nil
 	}
 
+	// Build rows for the live table.
+	rows := make([]ui.StatusRow, len(infos))
+	for i, info := range infos {
+		name := info.Name
+		if name == "" {
+			name = info.ID
+		}
+		rows[i] = ui.StatusRow{
+			Name:    name,
+			Repos:   fmt.Sprintf("%d", info.RepoCount),
+			Created: ui.RelativeTime(info.Created),
+		}
+	}
+
 	resolver := &status.Resolver{Runner: &status.ShellRunner{}}
 
-	type wsResult struct {
-		info   workspace.Info
-		status string
-	}
+	// Track errors from resolution goroutines.
+	var resolveErr error
+	var errOnce sync.Once
 
-	results := make([]wsResult, len(infos))
+	return ui.RunStatusTable(rows, func(send func(ui.StatusResolvedMsg)) {
+		g, gctx := errgroup.WithContext(ctx)
+		g.SetLimit(4)
 
-	err = ui.RunWithSpinner("Resolving workspace statuses...", func(report func(string)) error {
 		for i, info := range infos {
-			report(workspaceDisplayName(info.ID, stateFromInfo(info)))
-
-			spec, specErr := status.LoadWithFallback(
-				cfg.WorkspaceStatusSpecPath(info.ID),
-				cfg.StatusSpecFile,
-			)
-			if specErr != nil {
-				if errors.Is(specErr, status.ErrSpecNotFound) {
-					results[i] = wsResult{info: info, status: "-"}
-					continue
+			g.Go(func() error {
+				spec, specErr := status.LoadWithFallback(
+					cfg.WorkspaceStatusSpecPath(info.ID),
+					cfg.StatusSpecFile,
+				)
+				if specErr != nil {
+					if errors.Is(specErr, status.ErrSpecNotFound) {
+						send(ui.StatusResolvedMsg{Index: i, Status: "-"})
+						return nil
+					}
+					errOnce.Do(func() { resolveErr = fmt.Errorf("loading status spec for %s: %w", info.ID, specErr) })
+					send(ui.StatusResolvedMsg{Index: i, Status: "error"})
+					return nil
 				}
-				return fmt.Errorf("loading status spec for %s: %w", info.ID, specErr)
-			}
 
-			st, findErr := svc.Find(info.ID)
-			if findErr != nil {
-				results[i] = wsResult{info: info, status: "-"}
-				continue
-			}
+				st, findErr := svc.Find(info.ID)
+				if findErr != nil {
+					send(ui.StatusResolvedMsg{Index: i, Status: "-"})
+					return nil
+				}
 
-			repos := stateReposToInfo(st, cfg.WorkspacePath(info.ID))
-			wsName := info.Name
-			if wsName == "" {
-				wsName = info.ID
-			}
-			result := resolver.ResolveWorkspace(ctx, spec, repos, info.ID, wsName)
-			results[i] = wsResult{info: info, status: result.Status}
+				repos := stateReposToInfo(st, cfg.WorkspacePath(info.ID))
+				wsName := info.Name
+				if wsName == "" {
+					wsName = info.ID
+				}
+				result := resolver.ResolveWorkspace(gctx, spec, repos, info.ID, wsName)
+				send(ui.StatusResolvedMsg{Index: i, Status: result.Status})
+				return nil
+			})
 		}
-		return nil
+
+		_ = g.Wait()
+
+		if resolveErr != nil {
+			ui.Errorf("%v", resolveErr)
+		}
 	})
-	if err != nil {
-		if errors.Is(err, status.ErrSpecNotFound) {
-			ui.Print("No status spec found. Run " + ui.Code("flow reset status") + " to create one.")
-			return nil
-		}
-		return err
-	}
-
-	headers := []string{"NAME", "STATUS", "REPOS", "CREATED"}
-	var rows [][]string
-	for _, r := range results {
-		name := r.info.Name
-		if name == "" {
-			name = r.info.ID
-		}
-		rows = append(rows, []string{
-			name,
-			r.status,
-			fmt.Sprintf("%d", r.info.RepoCount),
-			ui.RelativeTime(r.info.Created),
-		})
-	}
-
-	fmt.Println(ui.Table(headers, rows))
-	return nil
 }
 
 func runStatusWorkspace(ctx context.Context, svc *workspace.Service, cfg *config.Config, idOrName string) error {
@@ -145,13 +144,22 @@ func runStatusWorkspace(ctx context.Context, svc *workspace.Service, cfg *config
 		return err
 	}
 
-	fmt.Printf("Status: %s\n", result.Status)
+	if st.Metadata.Description != "" {
+		ui.Printf("%s\n\n", st.Metadata.Description)
+	}
+
+	ui.Printf("Status: %s  (%s)\n", ui.StatusStyle(result.Status), ui.FormatDuration(result.Duration.Milliseconds()))
 
 	if len(result.Repos) > 0 {
-		headers := []string{"REPO", "BRANCH", "STATUS"}
+		headers := []string{"REPO", "BRANCH", "STATUS", "TIME"}
 		var rows [][]string
 		for _, r := range result.Repos {
-			rows = append(rows, []string{r.URL, r.Branch, r.Status})
+			rows = append(rows, []string{
+				status.RepoSlug(r.URL),
+				r.Branch,
+				ui.StatusStyle(r.Status),
+				ui.FormatDuration(r.Duration.Milliseconds()),
+			})
 		}
 		fmt.Println(ui.Table(headers, rows))
 	}
@@ -171,13 +179,4 @@ func stateReposToInfo(st *state.State, wsDir string) []status.RepoInfo {
 		}
 	}
 	return repos
-}
-
-// stateFromInfo creates a minimal State from workspace.Info for display helpers.
-func stateFromInfo(info workspace.Info) *state.State {
-	return &state.State{
-		Metadata: state.Metadata{
-			Name: info.Name,
-		},
-	}
 }
