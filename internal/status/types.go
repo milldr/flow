@@ -35,6 +35,7 @@ var namedColors = map[string]string{
 	"cyan":    "6",
 	"white":   "7",
 	"gray":    "8",
+	"purple":  "93",
 }
 
 // ColorCode returns the ANSI color code for an Entry's color.
