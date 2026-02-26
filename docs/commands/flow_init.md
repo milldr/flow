@@ -9,6 +9,7 @@ Create a new empty workspace
 
 Create a new empty workspace with a generated ID.
 Optionally provide a human-friendly name as the first argument.
+By default, launches the configured agent in the new workspace.
 
 ```
 flow init [name] [flags]
@@ -19,12 +20,14 @@ flow init [name] [flags]
 ```
   flow init
   flow init my-project
+  flow init my-project --no-exec
 ```
 
 ### Options
 
 ```
-  -h, --help   help for init
+  -h, --help      help for init
+      --no-exec   skip launching the agent after creation
 ```
 
 ### Options inherited from parent commands
