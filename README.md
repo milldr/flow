@@ -8,13 +8,23 @@ Working across multiple repos means repetitive setup, scattered branches, and cl
 
 ![flow demo](demo.gif)
 
-## Motivation
+## Features
 
-Flow is designed to be called by other AI agents — tools like [OpenClaw](https://github.com/openclaw) that integrate with Slack, Linear, or other services to understand context and then programmatically create state files and initialize workspaces. Prompt OpenClaw with a Slack thread or Linear ticket and let your agent create the workspace using Flow 🌊
+🌳 **Workspaces as code** — Declare repos and branches in a YAML state file. Repos are cloned once into a shared cache and checked out as lightweight git worktrees, so multiple workspaces pointing at the same repo don't duplicate data.
 
-Agents should call deterministic tools rather than relying on freeform interpretation with skills. This leads to more consistent results and reproducible environments.
+🚦 **Status tracking** — Define custom check commands that dynamically resolve the status of each repo in a workspace.
 
-## Quickstart
+🤖 **AI agent integration** — Generate shared context files and agent instructions across repos so your AI tools have the right skills and knowledge from the start.
+
+## Why flow?
+
+AI agents work best when they have deterministic tools instead of freeform instructions. Asking an agent to "set up a multi-repo workspace" produces inconsistent results — but giving it a CLI that manages YAML state files, bare clone caches, and git worktrees produces the same result every time.
+
+Flow is that deterministic layer. It gives agents (and humans) a small set of reliable commands for workspace lifecycle: create, define repos in YAML, render worktrees, check status. Agents call these tools through embedded skills rather than interpreting setup instructions on their own.
+
+Beyond workspace creation, flow centralizes agent skills across all your workspaces and lets you check the status of many workstreams in parallel. It is not opinionated about which agent or editor you use — configure Claude, Cursor, or anything else in a single config file. Everything is customizable: status checks, agent skills, workspace structure.
+
+## Getting started
 
 <details>
 <summary><strong>Install</strong></summary>
@@ -39,52 +49,28 @@ make install
 
 </details>
 
-<details>
-<summary><strong>Usage</strong></summary>
+### Create a workspace and start working
 
-### 1. Create a workspace
-
-Flow creates a workspace with an empty state file.
+Flow creates a workspace and launches your configured agent. Describe what you're working on and the agent handles the rest.
 
 ```bash
-flow init
+flow init my-project
 ```
 
-### 2. Add repos
+The agent reads its embedded skills to edit `state.yaml`, run `flow render`, and begin working in the repos.
 
-Open the state file in `$EDITOR` and define which repos and branches belong together.
+### Manual workflow
 
-```bash
-flow edit state calm-delta
-```
-
-### 3. Render it
-
-Flow fetches each repo into a shared bare clone cache, then creates lightweight worktrees in the workspace directory. Rendering is idempotent — re-running fetches updates and skips worktrees that already exist.
+Use `--no-exec` to skip the agent launch and set things up yourself:
 
 ```bash
-flow render calm-delta
-```
-
-### 4. Start working
-
-Launch your default agent directly into the workspace. Flow reads the `spec.agents` list from your global config and runs the one marked `default: true`.
-
-```bash
-flow exec calm-delta
+flow init my-project --no-exec
+flow edit state my-project    # add repos and branches
+flow render my-project        # clone repos, create worktrees
+flow exec my-project          # launch agent manually
 ```
 
 See the [spec reference](docs/specs/) for YAML file schemas and the [command reference](docs/commands/) for all commands.
-
-</details>
-
-## What it does
-
-🌳 **Workspaces as code** — Declare git worktrees in a YAML state file for instant, reproducible workspace setup across repos and branches.
-
-🚦 **Status tracking** — Define custom check commands that dynamically resolve the status of each repo in a workspace.
-
-🤖 **AI agent integration** — Generate shared context files and agent instructions across repos so your AI tools have the right skills and knowledge from the start.
 
 ## How it works
 
@@ -98,8 +84,9 @@ Flow stores everything under `~/.flow` (override with `$FLOW_HOME`):
 │   └── claude/
 │       ├── CLAUDE.md                   # Shared agent instructions
 │       └── skills/
-│           ├── flow-cli/SKILL.md       # Flow CLI skill
-│           └── workspace-structure/SKILL.md
+│           ├── flow-cli/SKILL.md       # Built-in: workspace management
+│           ├── workspace-structure/SKILL.md  # Built-in: directory layout
+│           └── find-repo/SKILL.md      # Your own custom skill
 ├── workspaces/
 │   └── calm-delta/                     # Workspace ID
 │       ├── state.yaml                  # Workspace manifest (name: vpc-ipv6)
@@ -118,31 +105,27 @@ Flow stores everything under `~/.flow` (override with `$FLOW_HOME`):
 
 Bare clones are shared across workspaces. Worktrees are cheap — they share the object store with the bare clone, so multiple workspaces pointing at the same repo don't duplicate data.
 
+Flow ships two built-in skills (`flow-cli` and `workspace-structure`) and preserves any custom skills you add to the same directory. Run `flow reset skills` to update the built-in skills without touching your own.
+
 See the [spec reference](docs/specs/) for YAML file schemas and the [command reference](docs/commands/) for usage, flags, and GIF demos.
+
+## Customization
+
+Flow stores everything under `~/.flow` (override with `$FLOW_HOME`). Edit these files to customize your setup:
+
+| Command | What it configures |
+|---------|-------------------|
+| `flow edit config` | Default agent, editor preferences |
+| `flow edit status` | Status checks for tracking workstreams |
+| `flow edit state <workspace>` | Repos and branches for a workspace |
+| `flow reset skills` | Restore default agent skills to latest |
+
+See the [spec reference](docs/specs/) for YAML schemas and the [command reference](docs/commands/) for all commands.
 
 ## Requirements
 
 - Go 1.25+
 - Git 2.20+ (worktree support)
-
-## Development
-
-```bash
-git clone https://github.com/milldr/flow.git
-cd flow
-
-# Build
-make build
-
-# Run tests
-make test
-
-# Lint
-make lint
-
-# Build release snapshot
-make snapshot
-```
 
 ## Support
 
