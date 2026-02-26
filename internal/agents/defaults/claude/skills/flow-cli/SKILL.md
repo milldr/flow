@@ -89,19 +89,17 @@ After committing your changes, you must push the branch to the remote **before**
 git push -u origin HEAD
 ```
 
-Then create the PR:
+Then create the PR. Because flow workspaces use git worktrees, `gh` cannot always detect the repo automatically. Always pass `--repo` and `--head` explicitly:
 
 ```bash
-gh pr create --title "..." --body "..."
+gh pr create --repo <owner>/<repo> --head <branch> --title "..." --body "..."
 ```
 
-**Common mistake**: running `gh pr create` without pushing first. This produces:
+**Common mistakes** — both produce the same error (`aborted: you must first push the current branch to a remote, or use the --head flag`):
+1. Running `gh pr create` without pushing first.
+2. Running `gh pr create` inside a worktree without `--repo` and `--head` flags.
 
-```
-aborted: you must first push the current branch to a remote, or use the --head flag
-```
-
-Always push first. The `-u` flag sets up tracking so subsequent pushes are just `git push`.
+Always push first, then use `--repo` and `--head`. The `-u` flag on push sets up tracking so subsequent pushes are just `git push`.
 
 ## Editing State
 
