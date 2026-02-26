@@ -13,15 +13,6 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
-// statusOrder defines the display sort order for statuses.
-var statusOrder = map[string]int{
-	"open":        0,
-	"in-progress": 1,
-	"in-review":   2,
-	"stale":       3,
-	"closed":      4,
-}
-
 // StatusRow holds the static columns for one workspace row.
 type StatusRow struct {
 	Name         string
@@ -37,16 +28,23 @@ type StatusResolvedMsg struct {
 	Status string
 }
 
+// StatusDisplayConfig holds spec-derived display settings for the status table.
+type StatusDisplayConfig struct {
+	Order  map[string]int    // status name → display sort index
+	Colors map[string]string // status name → ANSI color code
+}
+
 type statusTableModel struct {
 	rows     []StatusRow
 	statuses []string // resolved status per row; empty = pending
+	display  StatusDisplayConfig
 	spinner  spinner.Model
 	done     bool
 	total    int
 	resolved int
 }
 
-func newStatusTableModel(rows []StatusRow) statusTableModel {
+func newStatusTableModel(rows []StatusRow, display StatusDisplayConfig) statusTableModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
@@ -54,6 +52,7 @@ func newStatusTableModel(rows []StatusRow) statusTableModel {
 	return statusTableModel{
 		rows:     rows,
 		statuses: statuses,
+		display:  display,
 		spinner:  s,
 		total:    len(rows),
 	}
@@ -88,26 +87,27 @@ func (m statusTableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// sortedOrder returns indices sorted by status group then created time.
-func sortedOrder(rows []StatusRow, statuses []string) []int {
+// sortedOrder returns indices sorted by status group then created time (most recent first).
+func sortedOrder(rows []StatusRow, statuses []string, order map[string]int) []int {
 	indices := make([]int, len(rows))
 	for i := range indices {
 		indices[i] = i
 	}
+	maxOrder := len(order)
 	sort.SliceStable(indices, func(a, b int) bool {
 		ia, ib := indices[a], indices[b]
-		oa, oka := statusOrder[statuses[ia]]
-		ob, okb := statusOrder[statuses[ib]]
+		oa, oka := order[statuses[ia]]
+		ob, okb := order[statuses[ib]]
 		if !oka {
-			oa = len(statusOrder)
+			oa = maxOrder
 		}
 		if !okb {
-			ob = len(statusOrder)
+			ob = maxOrder
 		}
 		if oa != ob {
 			return oa < ob
 		}
-		return rows[ia].CreatedAt.Before(rows[ib].CreatedAt)
+		return rows[ib].CreatedAt.Before(rows[ia].CreatedAt)
 	})
 	return indices
 }
@@ -130,7 +130,7 @@ func (m statusTableModel) renderTable(showSpinner bool, sortStatuses []string) s
 	cellStyle := lipgloss.NewStyle().PaddingRight(2)
 
 	headers := []string{"NAME", "STATUS", "REPOS", "CREATED"}
-	order := sortedOrder(m.rows, sortStatuses)
+	order := sortedOrder(m.rows, sortStatuses, m.display.Order)
 
 	var rows [][]string
 	for _, i := range order {
@@ -143,7 +143,7 @@ func (m statusTableModel) renderTable(showSpinner bool, sortStatuses []string) s
 				statusCell = "..."
 			}
 		} else {
-			statusCell = StatusStyle(m.statuses[i])
+			statusCell = StatusStyle(m.statuses[i], m.display.Colors)
 		}
 		rows = append(rows, []string{row.Name, statusCell, row.Repos, row.Created})
 	}
@@ -167,12 +167,12 @@ func (m statusTableModel) renderTable(showSpinner bool, sortStatuses []string) s
 // function runs concurrently and sends StatusResolvedMsg via send as each
 // workspace status is determined. In non-TTY mode, resolve runs to completion
 // and a static table is printed. Returns the resolved statuses indexed by row.
-func RunStatusTable(rows []StatusRow, resolve func(send func(StatusResolvedMsg))) ([]string, error) {
+func RunStatusTable(rows []StatusRow, display StatusDisplayConfig, resolve func(send func(StatusResolvedMsg))) ([]string, error) {
 	if plain || !isatty.IsTerminal(os.Stdout.Fd()) {
-		return runStatusTablePlain(rows, resolve)
+		return runStatusTablePlain(rows, display, resolve)
 	}
 
-	m := newStatusTableModel(rows)
+	m := newStatusTableModel(rows, display)
 	p := tea.NewProgram(m)
 
 	go resolve(func(msg StatusResolvedMsg) {
@@ -191,7 +191,7 @@ func RunStatusTable(rows []StatusRow, resolve func(send func(StatusResolvedMsg))
 	return final.statuses, nil
 }
 
-func runStatusTablePlain(rows []StatusRow, resolve func(send func(StatusResolvedMsg))) ([]string, error) {
+func runStatusTablePlain(rows []StatusRow, display StatusDisplayConfig, resolve func(send func(StatusResolvedMsg))) ([]string, error) {
 	statuses := make([]string, len(rows))
 	resolve(func(msg StatusResolvedMsg) {
 		if msg.Index >= 0 && msg.Index < len(statuses) {
@@ -199,7 +199,7 @@ func runStatusTablePlain(rows []StatusRow, resolve func(send func(StatusResolved
 		}
 	})
 
-	order := sortedOrder(rows, statuses)
+	order := sortedOrder(rows, statuses, display.Order)
 
 	headers := []string{"NAME", "STATUS", "REPOS", "CREATED"}
 	var tableRows [][]string

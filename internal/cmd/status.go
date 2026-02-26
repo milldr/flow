@@ -70,13 +70,24 @@ func runStatusAll(ctx context.Context, svc *workspace.Service, cfg *config.Confi
 		}
 	}
 
+	// Load the global spec for display config (sort order + colors).
+	globalSpec, specErr := status.Load(cfg.StatusSpecFile)
+	if specErr != nil {
+		// Fall back to default spec if global spec can't be loaded.
+		globalSpec = status.DefaultSpec()
+	}
+	display := ui.StatusDisplayConfig{
+		Order:  globalSpec.DisplayOrder(),
+		Colors: globalSpec.ColorMap(),
+	}
+
 	resolver := &status.Resolver{Runner: &status.ShellRunner{}}
 
 	// Track errors from resolution goroutines.
 	var resolveErr error
 	var errOnce sync.Once
 
-	resolved, err := ui.RunStatusTable(rows, func(send func(ui.StatusResolvedMsg)) {
+	resolved, err := ui.RunStatusTable(rows, display, func(send func(ui.StatusResolvedMsg)) {
 		g, gctx := errgroup.WithContext(ctx)
 		g.SetLimit(4)
 
@@ -173,7 +184,8 @@ func runStatusWorkspace(ctx context.Context, svc *workspace.Service, cfg *config
 		ui.Printf("%s\n\n", st.Metadata.Description)
 	}
 
-	ui.Printf("Status: %s  (%s)\n", ui.StatusStyle(result.Status), ui.FormatDuration(result.Duration.Milliseconds()))
+	colorMap := spec.ColorMap()
+	ui.Printf("Status: %s  (%s)\n", ui.StatusStyle(result.Status, colorMap), ui.FormatDuration(result.Duration.Milliseconds()))
 
 	if len(result.Repos) > 0 {
 		headers := []string{"REPO", "BRANCH", "STATUS", "TIME"}
@@ -182,7 +194,7 @@ func runStatusWorkspace(ctx context.Context, svc *workspace.Service, cfg *config
 			rows = append(rows, []string{
 				status.RepoSlug(r.URL),
 				r.Branch,
-				ui.StatusStyle(r.Status),
+				ui.StatusStyle(r.Status, colorMap),
 				ui.FormatDuration(r.Duration.Milliseconds()),
 			})
 		}

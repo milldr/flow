@@ -111,26 +111,31 @@ func DefaultSpec() *Spec {
 				{
 					Name:        "closed",
 					Description: "All PRs merged or closed",
+					Color:       "green",
 					Check:       `gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state merged --json number | jq -e 'length > 0' > /dev/null 2>&1 && gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state open --json number | jq -e 'length == 0' > /dev/null 2>&1`,
 				},
 				{
 					Name:        "stale",
 					Description: "Workspace inactive",
+					Color:       "magenta",
 					Check:       "false",
 				},
 				{
 					Name:        "in-review",
 					Description: "Non-draft PR open",
+					Color:       "yellow",
 					Check:       `gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state open --json isDraft | jq -e 'map(select(.isDraft == false)) | length > 0' > /dev/null 2>&1`,
 				},
 				{
 					Name:        "in-progress",
 					Description: "Local diffs or draft PR",
+					Color:       "blue",
 					Check:       `git -C "$FLOW_REPO_PATH" status --porcelain 2>/dev/null | grep -q . || { _r=$(git ls-remote "$(git -C "$FLOW_REPO_PATH" remote get-url origin 2>/dev/null)" "$FLOW_REPO_BRANCH" 2>/dev/null | cut -f1) && [ -n "$_r" ] && [ "$(git -C "$FLOW_REPO_PATH" rev-parse HEAD 2>/dev/null)" != "$_r" ] && git -C "$FLOW_REPO_PATH" cat-file -e "$_r" 2>/dev/null && if git -C "$FLOW_REPO_PATH" merge-base --is-ancestor HEAD "$_r" 2>/dev/null; then false; fi; } || gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state open --json isDraft | jq -e 'map(select(.isDraft)) | length > 0' > /dev/null 2>&1`,
 				},
 				{
 					Name:        "open",
 					Description: "Workspace created, no changes yet",
+					Color:       "gray",
 					Default:     true,
 				},
 			},

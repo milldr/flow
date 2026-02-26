@@ -57,6 +57,8 @@ func TestRelativeTime(t *testing.T) {
 }
 
 func TestStatusStyle(t *testing.T) {
+	colorMap := map[string]string{"closed": "2", "open": "8"}
+
 	tests := []struct {
 		status string
 		want   string // substring that must appear in styled output
@@ -71,7 +73,7 @@ func TestStatusStyle(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.status, func(t *testing.T) {
-			got := StatusStyle(tt.status)
+			got := StatusStyle(tt.status, colorMap)
 			if !strings.Contains(got, tt.want) {
 				t.Errorf("StatusStyle(%q) = %q, does not contain %q", tt.status, got, tt.want)
 			}
@@ -79,7 +81,7 @@ func TestStatusStyle(t *testing.T) {
 	}
 
 	// Unknown status should be returned unstyled (no ANSI escape codes).
-	got := StatusStyle("unknown")
+	got := StatusStyle("unknown", colorMap)
 	if got != "unknown" {
 		t.Errorf("StatusStyle(\"unknown\") = %q, want plain \"unknown\"", got)
 	}
