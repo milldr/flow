@@ -80,6 +80,27 @@ spec:
 
 **Important**: `branch` is the branch you want to work on, not a base branch. If the branch already exists in the remote, `flow render` checks it out. If it doesn't exist, flow automatically creates it off the repo's default branch (e.g., `main`). You do not need to clone repos yourself — `flow render` handles cloning, branch creation, and checkout.
 
+## Pushing and Creating PRs
+
+After committing your changes, you must push the branch to the remote **before** creating a PR. Flow renders branches locally — they don't exist on GitHub until you push.
+
+```bash
+# From inside the repo directory:
+git push -u origin HEAD
+```
+
+Then create the PR. Because flow workspaces use git worktrees, `gh` cannot always detect the repo automatically. Always pass `--repo` and `--head` explicitly:
+
+```bash
+gh pr create --repo <owner>/<repo> --head <branch> --title "..." --body "..."
+```
+
+**Common mistakes** — both produce the same error (`aborted: you must first push the current branch to a remote, or use the --head flag`):
+1. Running `gh pr create` without pushing first.
+2. Running `gh pr create` inside a worktree without `--repo` and `--head` flags.
+
+Always push first, then use `--repo` and `--head`. The `-u` flag on push sets up tracking so subsequent pushes are just `git push`.
+
 ## Editing State
 
 To modify a workspace (add/remove repos, change branches), edit the `state.yaml` file directly, then run `flow render <workspace>` to apply changes. Flow will clone any new repos and check out the specified branches.
