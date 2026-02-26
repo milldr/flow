@@ -76,6 +76,7 @@ func testService(t *testing.T) (*Service, *mockRunner) {
 		WorkspacesDir:  filepath.Join(dir, "workspaces"),
 		ReposDir:       filepath.Join(dir, "repos"),
 		AgentsDir:      filepath.Join(dir, "agents"),
+		CacheDir:       filepath.Join(dir, "cache"),
 		ConfigFile:     filepath.Join(dir, "config.yaml"),
 		StatusSpecFile: filepath.Join(dir, "status.yaml"),
 	}

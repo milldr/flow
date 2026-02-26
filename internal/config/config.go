@@ -15,6 +15,7 @@ type Config struct {
 	WorkspacesDir  string      // ~/.flow/workspaces/
 	ReposDir       string      // ~/.flow/repos/
 	AgentsDir      string      // ~/.flow/agents/
+	CacheDir       string      // ~/.flow/cache/
 	ConfigFile     string      // ~/.flow/config.yaml
 	StatusSpecFile string      // ~/.flow/status.yaml
 	FlowConfig     *FlowConfig // loaded global config
@@ -37,6 +38,7 @@ func New() (*Config, error) {
 		WorkspacesDir:  filepath.Join(home, "workspaces"),
 		ReposDir:       filepath.Join(home, "repos"),
 		AgentsDir:      filepath.Join(home, "agents"),
+		CacheDir:       filepath.Join(home, "cache"),
 		ConfigFile:     filepath.Join(home, "config.yaml"),
 		StatusSpecFile: filepath.Join(home, "status.yaml"),
 	}, nil
@@ -64,6 +66,11 @@ func (c *Config) ClaudeAgentDir() string {
 	return filepath.Join(c.AgentsDir, "claude")
 }
 
+// StatusCacheFile returns the path to the status cache JSON file.
+func (c *Config) StatusCacheFile() string {
+	return filepath.Join(c.CacheDir, "status.json")
+}
+
 // WorkspaceStatusSpecPath returns the status.yaml path for a workspace.
 func (c *Config) WorkspaceStatusSpecPath(id string) string {
 	return filepath.Join(c.WorkspacesDir, id, "status.yaml")
@@ -72,7 +79,7 @@ func (c *Config) WorkspaceStatusSpecPath(id string) string {
 // EnsureDirs creates the top-level directories if they don't exist.
 // It also creates the default config file if missing, and loads the config.
 func (c *Config) EnsureDirs() error {
-	for _, dir := range []string{c.WorkspacesDir, c.ReposDir, c.AgentsDir} {
+	for _, dir := range []string{c.WorkspacesDir, c.ReposDir, c.AgentsDir, c.CacheDir} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}

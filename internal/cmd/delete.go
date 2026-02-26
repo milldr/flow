@@ -2,6 +2,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/milldr/flow/internal/state"
 	"github.com/milldr/flow/internal/ui"
 	"github.com/milldr/flow/internal/workspace"
@@ -12,46 +14,49 @@ func newDeleteCmd(svc *workspace.Service) *cobra.Command {
 	var force bool
 
 	cmd := &cobra.Command{
-		Use:   "delete <workspace>",
-		Short: "Delete a workspace and its worktrees",
-		Args:  cobra.ExactArgs(1),
+		Use:   "delete <workspace> [workspace...]",
+		Short: "Delete one or more workspaces and their worktrees",
+		Args:  cobra.MinimumNArgs(1),
 		Example: `  flow delete calm-delta
-  flow delete calm-delta --force`,
+  flow delete calm-delta warm-brook --force
+  flow delete ws1 ws2 ws3`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			id, st, err := resolveWorkspace(svc, args[0])
-			if err != nil {
-				return err
-			}
+			for _, arg := range args {
+				id, st, err := resolveWorkspace(svc, arg)
+				if err != nil {
+					return fmt.Errorf("%s: %w", arg, err)
+				}
 
-			name := workspaceDisplayName(id, st)
+				name := workspaceDisplayName(id, st)
 
-			if !force {
-				repos := make([]ui.DeleteRepo, len(st.Spec.Repos))
-				for i, r := range st.Spec.Repos {
-					repos[i] = ui.DeleteRepo{
-						Path:   state.RepoPath(r),
-						Branch: r.Branch,
+				if !force {
+					repos := make([]ui.DeleteRepo, len(st.Spec.Repos))
+					for i, r := range st.Spec.Repos {
+						repos[i] = ui.DeleteRepo{
+							Path:   state.RepoPath(r),
+							Branch: r.Branch,
+						}
+					}
+
+					confirmed, err := ui.ConfirmDelete(name, id, repos)
+					if err != nil {
+						return err
+					}
+					if !confirmed {
+						ui.Print("Skipped: " + name)
+						continue
 					}
 				}
 
-				confirmed, err := ui.ConfirmDelete(name, id, repos)
+				err = ui.RunWithSpinner("Deleting workspace: "+name, func(_ func(string)) error {
+					return svc.Delete(cmd.Context(), id)
+				})
 				if err != nil {
-					return err
+					return fmt.Errorf("deleting %s: %w", name, err)
 				}
-				if !confirmed {
-					ui.Print("Cancelled.")
-					return nil
-				}
-			}
 
-			err = ui.RunWithSpinner("Deleting workspace: "+name, func(_ func(string)) error {
-				return svc.Delete(cmd.Context(), id)
-			})
-			if err != nil {
-				return err
+				ui.Success("Deleted workspace: " + name)
 			}
-
-			ui.Success("Deleted workspace: " + name)
 			return nil
 		},
 	}

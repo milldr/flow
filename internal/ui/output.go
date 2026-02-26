@@ -68,6 +68,8 @@ func StatusStyle(status string) string {
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Render(status)
 	case "open":
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render(status)
+	case "stale":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("5")).Render(status)
 	default:
 		return status
 	}

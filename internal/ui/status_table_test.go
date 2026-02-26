@@ -133,7 +133,7 @@ func TestRunStatusTablePlain(t *testing.T) {
 	}
 
 	var called bool
-	err := runStatusTablePlain(rows, func(send func(StatusResolvedMsg)) {
+	resolved, err := runStatusTablePlain(rows, func(send func(StatusResolvedMsg)) {
 		called = true
 		send(StatusResolvedMsg{Index: 0, Status: "closed"})
 		send(StatusResolvedMsg{Index: 1, Status: "open"})
@@ -144,6 +144,9 @@ func TestRunStatusTablePlain(t *testing.T) {
 	}
 	if !called {
 		t.Fatal("expected resolve function to be called")
+	}
+	if resolved[0] != "closed" || resolved[1] != "open" {
+		t.Errorf("unexpected resolved statuses: %v", resolved)
 	}
 }
 
