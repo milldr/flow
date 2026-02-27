@@ -82,7 +82,8 @@ func (r *Resolver) ResolveRepo(ctx context.Context, spec *Spec, repo RepoInfo, w
 
 // ResolveWorkspace resolves the status for each repo concurrently and
 // returns the aggregated workspace result. The workspace status is the
-// least-advanced status (highest index in spec order) across all repos.
+// least-advanced status (highest index in spec order) across all repos,
+// excluding skipped repos and repos at the default status.
 func (r *Resolver) ResolveWorkspace(ctx context.Context, spec *Spec, repos []RepoInfo, wsID, wsName string) *WorkspaceResult {
 	wsStart := time.Now()
 	result := &WorkspaceResult{
@@ -91,18 +92,24 @@ func (r *Resolver) ResolveWorkspace(ctx context.Context, spec *Spec, repos []Rep
 		Repos:         make([]RepoResult, len(repos)),
 	}
 
+	// Find the default status index.
+	defaultIdx := -1
+	for i, e := range spec.Spec.Statuses {
+		if e.Default {
+			defaultIdx = i
+			break
+		}
+	}
+
 	if len(repos) == 0 {
-		// No repos — use the default status.
-		for _, e := range spec.Spec.Statuses {
-			if e.Default {
-				result.Status = e.Name
-				break
-			}
+		if defaultIdx >= 0 {
+			result.Status = spec.Spec.Statuses[defaultIdx].Name
 		}
 		result.Duration = time.Since(wsStart)
 		return result
 	}
 
+	skipped := make([]bool, len(repos))
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
@@ -111,8 +118,17 @@ func (r *Resolver) ResolveWorkspace(ctx context.Context, spec *Spec, repos []Rep
 		go func(idx int, rp RepoInfo) {
 			defer wg.Done()
 			repoStart := time.Now()
+			env := buildEnv(rp, wsID, wsName)
+
+			// Run skip check if configured.
+			skip := false
+			if spec.Spec.Skip != "" {
+				skip = r.Runner.RunCheck(ctx, spec.Spec.Skip, env)
+			}
+
 			status := r.ResolveRepo(ctx, spec, rp, wsID, wsName)
 			mu.Lock()
+			skipped[idx] = skip
 			result.Repos[idx] = RepoResult{
 				URL:      rp.URL,
 				Branch:   rp.Branch,
@@ -132,16 +148,29 @@ func (r *Resolver) ResolveWorkspace(ctx context.Context, spec *Spec, repos []Rep
 		orderIndex[e.Name] = i
 	}
 
-	// Workspace status = least advanced (highest index) across repos.
+	// Workspace status = least advanced (highest index) across repos,
+	// excluding skipped repos and repos at the default status.
 	worstIdx := -1
-	for _, rr := range result.Repos {
+	for i, rr := range result.Repos {
+		if skipped[i] {
+			continue
+		}
 		idx, ok := orderIndex[rr.Status]
-		if ok && idx > worstIdx {
+		if !ok {
+			continue
+		}
+		if idx == defaultIdx {
+			continue
+		}
+		if idx > worstIdx {
 			worstIdx = idx
 		}
 	}
+
 	if worstIdx >= 0 {
 		result.Status = spec.Spec.Statuses[worstIdx].Name
+	} else if defaultIdx >= 0 {
+		result.Status = spec.Spec.Statuses[defaultIdx].Name
 	}
 
 	return result

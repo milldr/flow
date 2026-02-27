@@ -5,6 +5,7 @@ import "time"
 
 // SpecBody holds the statuses list nested under spec.
 type SpecBody struct {
+	Skip     string  `yaml:"skip,omitempty"`
 	Statuses []Entry `yaml:"statuses,omitempty"`
 }
 
