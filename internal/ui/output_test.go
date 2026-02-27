@@ -1,6 +1,9 @@
 package ui
 
 import (
+	"bytes"
+	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -57,6 +60,8 @@ func TestRelativeTime(t *testing.T) {
 }
 
 func TestStatusStyle(t *testing.T) {
+	colorMap := map[string]string{"closed": "2", "open": "8"}
+
 	tests := []struct {
 		status string
 		want   string // substring that must appear in styled output
@@ -71,7 +76,7 @@ func TestStatusStyle(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.status, func(t *testing.T) {
-			got := StatusStyle(tt.status)
+			got := StatusStyle(tt.status, colorMap)
 			if !strings.Contains(got, tt.want) {
 				t.Errorf("StatusStyle(%q) = %q, does not contain %q", tt.status, got, tt.want)
 			}
@@ -79,9 +84,96 @@ func TestStatusStyle(t *testing.T) {
 	}
 
 	// Unknown status should be returned unstyled (no ANSI escape codes).
-	got := StatusStyle("unknown")
+	got := StatusStyle("unknown", colorMap)
 	if got != "unknown" {
 		t.Errorf("StatusStyle(\"unknown\") = %q, want plain \"unknown\"", got)
+	}
+}
+
+func TestCode(t *testing.T) {
+	got := Code("flow render")
+	if !strings.Contains(got, "flow render") {
+		t.Errorf("Code() = %q, does not contain input text", got)
+	}
+}
+
+// captureStdout captures stdout during fn execution.
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := os.Stdout
+	os.Stdout = w
+
+	fn()
+
+	_ = w.Close()
+	os.Stdout = old
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+	return buf.String()
+}
+
+// captureStderr captures stderr during fn execution.
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := os.Stderr
+	os.Stderr = w
+
+	fn()
+
+	_ = w.Close()
+	os.Stderr = old
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+	return buf.String()
+}
+
+func TestSuccess(t *testing.T) {
+	out := captureStdout(t, func() { Success("it worked") })
+	if !strings.Contains(out, "it worked") {
+		t.Errorf("Success() output = %q, want it to contain 'it worked'", out)
+	}
+}
+
+func TestWarning(t *testing.T) {
+	out := captureStdout(t, func() { Warning("watch out") })
+	if !strings.Contains(out, "watch out") {
+		t.Errorf("Warning() output = %q, want it to contain 'watch out'", out)
+	}
+}
+
+func TestError(t *testing.T) {
+	out := captureStderr(t, func() { Error("bad thing") })
+	if !strings.Contains(out, "bad thing") {
+		t.Errorf("Error() output = %q, want it to contain 'bad thing'", out)
+	}
+}
+
+func TestErrorf(t *testing.T) {
+	out := captureStderr(t, func() { Errorf("code %d", 42) })
+	if !strings.Contains(out, "code 42") {
+		t.Errorf("Errorf() output = %q, want it to contain 'code 42'", out)
+	}
+}
+
+func TestPrint(t *testing.T) {
+	out := captureStdout(t, func() { Print("hello") })
+	if !strings.Contains(out, "hello") {
+		t.Errorf("Print() output = %q, want it to contain 'hello'", out)
+	}
+}
+
+func TestPrintf(t *testing.T) {
+	out := captureStdout(t, func() { Printf("num=%d", 7) })
+	if !strings.Contains(out, "num=7") {
+		t.Errorf("Printf() output = %q, want it to contain 'num=7'", out)
 	}
 }
 

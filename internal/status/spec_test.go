@@ -26,8 +26,8 @@ func TestLoadAndSave(t *testing.T) {
 	if loaded.Kind != "Status" {
 		t.Errorf("Kind = %q, want Status", loaded.Kind)
 	}
-	if len(loaded.Spec.Statuses) != 4 {
-		t.Errorf("Statuses count = %d, want 4", len(loaded.Spec.Statuses))
+	if len(loaded.Spec.Statuses) != 5 {
+		t.Errorf("Statuses count = %d, want 5", len(loaded.Spec.Statuses))
 	}
 }
 

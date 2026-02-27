@@ -79,10 +79,11 @@ create_repo "docs"    "update/guides"    "README.md" "update setup guide"
 create_repo "web"     "feat/dashboard"   "main.go"   "add dashboard page"
 create_repo "billing" "feat/billing-v2"  "main.go"   "billing v2 migration"
 create_repo "gateway" "feat/rate-limits" "main.go"   "add rate limiting"
+create_repo "config"  "feat/env-vars"    "main.go"   "add env var support"
 
 # --- Pre-populate bare clone cache for realistic URLs ---
 
-for name in app api docs web billing gateway; do
+for name in app api docs web billing gateway config; do
   bare="$FLOW_HOME/repos/github.com/acme/${name}.git"
   mkdir -p "$(dirname "$bare")"
   git clone --bare "/tmp/demo/$name" "$bare" -q
@@ -166,11 +167,28 @@ spec:
 YAML
 )"
 
+# Workspace: env-config — will be "open" (no changes)
+create_workspace "iron-vale" "$(cat <<'YAML'
+apiVersion: flow/v1
+kind: State
+metadata:
+  name: env-config
+  description: Add environment variable support
+  created: "2026-02-26T08:00:00Z"
+spec:
+  repos:
+    - url: github.com/acme/config
+      branch: feat/env-vars
+      path: config
+YAML
+)"
+
 # Render all workspaces
 $FLOW render bold-creek
 $FLOW render swift-pine
 $FLOW render calm-ridge
 $FLOW render dry-fog
+$FLOW render iron-vale
 
 # --- Set up different statuses via local changes and marker files ---
 
@@ -209,14 +227,22 @@ spec:
   statuses:
     - name: closed
       description: All PRs merged or closed
+      color: "131"
       check: test -f "\$FLOW_REPO_PATH/.flow-closed"
+    - name: stale
+      description: Workspace inactive
+      color: magenta
+      check: 'false'
     - name: in-review
       description: Non-draft PR open
+      color: purple
       check: test -f "\$FLOW_REPO_PATH/.flow-review"
     - name: in-progress
       description: Local diffs or draft PR
+      color: yellow
       check: git -C "\$FLOW_REPO_PATH" diff --name-only "origin/\$FLOW_REPO_BRANCH" 2>/dev/null | grep -q .
     - name: open
       description: Workspace created, no changes yet
+      color: green
       default: true
 YAML

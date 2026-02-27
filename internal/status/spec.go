@@ -102,6 +102,17 @@ func LoadWithFallback(workspacePath, globalPath string) (*Spec, error) {
 }
 
 // DefaultSpec returns a starter status spec with a basic PR workflow.
+//
+// Status checks are evaluated top-to-bottom per repo; first match wins.
+// The workspace-level status is the least-advanced (highest index) across repos.
+//
+// Default statuses:
+//
+//	closed       — a merged PR exists and no open PRs remain (requires gh)
+//	stale        — no commits on the branch in the last 14 days (local git only)
+//	in-review    — a non-draft open PR exists on the branch (requires gh)
+//	in-progress  — uncommitted changes, unpushed commits, or a draft PR
+//	open         — default; none of the above matched
 func DefaultSpec() *Spec {
 	return &Spec{
 		APIVersion: "flow/v1",
@@ -110,22 +121,32 @@ func DefaultSpec() *Spec {
 			Statuses: []Entry{
 				{
 					Name:        "closed",
-					Description: "All PRs merged or closed",
+					Description: "Merged PR, no open PRs remaining",
+					Color:       "131",
 					Check:       `gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state merged --json number | jq -e 'length > 0' > /dev/null 2>&1 && gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state open --json number | jq -e 'length == 0' > /dev/null 2>&1`,
 				},
 				{
+					Name:        "stale",
+					Description: "No commits on branch in last 14 days",
+					Color:       "magenta",
+					Check:       `_now=$(date +%s) && _last=$(git -C "$FLOW_REPO_PATH" log -1 --format=%ct 2>/dev/null) && [ -n "$_last" ] && [ $((_now - _last)) -gt 1209600 ]`,
+				},
+				{
 					Name:        "in-review",
-					Description: "Non-draft PR open",
+					Description: "Non-draft open PR on branch",
+					Color:       "purple",
 					Check:       `gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state open --json isDraft | jq -e 'map(select(.isDraft == false)) | length > 0' > /dev/null 2>&1`,
 				},
 				{
 					Name:        "in-progress",
-					Description: "Local diffs or draft PR",
-					Check:       `git -C "$FLOW_REPO_PATH" status --porcelain 2>/dev/null | grep -q . || { _r=$(git ls-remote "$(git -C "$FLOW_REPO_PATH" remote get-url origin 2>/dev/null)" "$FLOW_REPO_BRANCH" 2>/dev/null | cut -f1) && [ -n "$_r" ] && [ "$(git -C "$FLOW_REPO_PATH" rev-parse HEAD 2>/dev/null)" != "$_r" ] && git -C "$FLOW_REPO_PATH" cat-file -e "$_r" 2>/dev/null && if git -C "$FLOW_REPO_PATH" merge-base --is-ancestor HEAD "$_r" 2>/dev/null; then false; fi; } || gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state open --json isDraft | jq -e 'map(select(.isDraft)) | length > 0' > /dev/null 2>&1`,
+					Description: "Uncommitted changes, unpushed commits, or draft PR",
+					Color:       "yellow",
+					Check:       `git -C "$FLOW_REPO_PATH" status --porcelain 2>/dev/null | grep -q . || git -C "$FLOW_REPO_PATH" log --oneline "origin/$FLOW_REPO_BRANCH..HEAD" 2>/dev/null | grep -q . || gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state open --json isDraft | jq -e 'map(select(.isDraft)) | length > 0' > /dev/null 2>&1`,
 				},
 				{
 					Name:        "open",
-					Description: "Workspace created, no changes yet",
+					Description: "No changes detected",
+					Color:       "green",
 					Default:     true,
 				},
 			},

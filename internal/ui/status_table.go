@@ -3,6 +3,8 @@ package ui
 import (
 	"fmt"
 	"os"
+	"sort"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -13,9 +15,11 @@ import (
 
 // StatusRow holds the static columns for one workspace row.
 type StatusRow struct {
-	Name    string
-	Repos   string
-	Created string
+	Name         string
+	Repos        string
+	Created      string
+	CreatedAt    time.Time // used for sorting within status groups
+	CachedStatus string    // last-known status for initial sort order
 }
 
 // StatusResolvedMsg signals that a row's status has been resolved.
@@ -24,16 +28,23 @@ type StatusResolvedMsg struct {
 	Status string
 }
 
+// StatusDisplayConfig holds spec-derived display settings for the status table.
+type StatusDisplayConfig struct {
+	Order  map[string]int    // status name → display sort index
+	Colors map[string]string // status name → ANSI color code
+}
+
 type statusTableModel struct {
 	rows     []StatusRow
 	statuses []string // resolved status per row; empty = pending
+	display  StatusDisplayConfig
 	spinner  spinner.Model
 	done     bool
 	total    int
 	resolved int
 }
 
-func newStatusTableModel(rows []StatusRow) statusTableModel {
+func newStatusTableModel(rows []StatusRow, display StatusDisplayConfig) statusTableModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
@@ -41,6 +52,7 @@ func newStatusTableModel(rows []StatusRow) statusTableModel {
 	return statusTableModel{
 		rows:     rows,
 		statuses: statuses,
+		display:  display,
 		spinner:  s,
 		total:    len(rows),
 	}
@@ -75,22 +87,54 @@ func (m statusTableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m statusTableModel) View() string {
-	if m.done {
-		// Final render: show the completed table without spinners.
-		return m.renderTable(false) + "\n"
+// sortedOrder returns indices sorted by status group then created time (most recent first).
+func sortedOrder(rows []StatusRow, statuses []string, order map[string]int) []int {
+	indices := make([]int, len(rows))
+	for i := range indices {
+		indices[i] = i
 	}
-	return m.renderTable(true) + "\n"
+	maxOrder := len(order)
+	sort.SliceStable(indices, func(a, b int) bool {
+		ia, ib := indices[a], indices[b]
+		oa, oka := order[statuses[ia]]
+		ob, okb := order[statuses[ib]]
+		if !oka {
+			oa = maxOrder
+		}
+		if !okb {
+			ob = maxOrder
+		}
+		if oa != ob {
+			return oa < ob
+		}
+		return rows[ib].CreatedAt.Before(rows[ia].CreatedAt)
+	})
+	return indices
 }
 
-func (m statusTableModel) renderTable(showSpinner bool) string {
+func (m statusTableModel) View() string {
+	if m.done {
+		// Final render: sort by resolved statuses.
+		return m.renderTable(false, m.statuses) + "\n"
+	}
+	// Live render: sort by cached statuses for stable initial ordering.
+	cached := make([]string, len(m.rows))
+	for i, row := range m.rows {
+		cached[i] = row.CachedStatus
+	}
+	return m.renderTable(true, cached) + "\n"
+}
+
+func (m statusTableModel) renderTable(showSpinner bool, sortStatuses []string) string {
 	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("4")).PaddingRight(2)
 	cellStyle := lipgloss.NewStyle().PaddingRight(2)
 
 	headers := []string{"NAME", "STATUS", "REPOS", "CREATED"}
-	var rows [][]string
+	order := sortedOrder(m.rows, sortStatuses, m.display.Order)
 
-	for i, row := range m.rows {
+	var rows [][]string
+	for _, i := range order {
+		row := m.rows[i]
 		var statusCell string
 		if m.statuses[i] == "" {
 			if showSpinner {
@@ -99,7 +143,7 @@ func (m statusTableModel) renderTable(showSpinner bool) string {
 				statusCell = "..."
 			}
 		} else {
-			statusCell = StatusStyle(m.statuses[i])
+			statusCell = StatusStyle(m.statuses[i], m.display.Colors)
 		}
 		rows = append(rows, []string{row.Name, statusCell, row.Repos, row.Created})
 	}
@@ -122,13 +166,13 @@ func (m statusTableModel) renderTable(showSpinner bool) string {
 // RunStatusTable displays a live-updating table in TTY mode. The resolve
 // function runs concurrently and sends StatusResolvedMsg via send as each
 // workspace status is determined. In non-TTY mode, resolve runs to completion
-// and a static table is printed.
-func RunStatusTable(rows []StatusRow, resolve func(send func(StatusResolvedMsg))) error {
+// and a static table is printed. Returns the resolved statuses indexed by row.
+func RunStatusTable(rows []StatusRow, display StatusDisplayConfig, resolve func(send func(StatusResolvedMsg))) ([]string, error) {
 	if plain || !isatty.IsTerminal(os.Stdout.Fd()) {
-		return runStatusTablePlain(rows, resolve)
+		return runStatusTablePlain(rows, display, resolve)
 	}
 
-	m := newStatusTableModel(rows)
+	m := newStatusTableModel(rows, display)
 	p := tea.NewProgram(m)
 
 	go resolve(func(msg StatusResolvedMsg) {
@@ -137,17 +181,17 @@ func RunStatusTable(rows []StatusRow, resolve func(send func(StatusResolvedMsg))
 
 	result, err := p.Run()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	final := result.(statusTableModel)
 	if final.resolved < final.total {
-		return ErrInterrupted
+		return final.statuses, ErrInterrupted
 	}
-	return nil
+	return final.statuses, nil
 }
 
-func runStatusTablePlain(rows []StatusRow, resolve func(send func(StatusResolvedMsg))) error {
+func runStatusTablePlain(rows []StatusRow, display StatusDisplayConfig, resolve func(send func(StatusResolvedMsg))) ([]string, error) {
 	statuses := make([]string, len(rows))
 	resolve(func(msg StatusResolvedMsg) {
 		if msg.Index >= 0 && msg.Index < len(statuses) {
@@ -155,18 +199,20 @@ func runStatusTablePlain(rows []StatusRow, resolve func(send func(StatusResolved
 		}
 	})
 
+	order := sortedOrder(rows, statuses, display.Order)
+
 	headers := []string{"NAME", "STATUS", "REPOS", "CREATED"}
 	var tableRows [][]string
-	for i, row := range rows {
+	for _, i := range order {
 		s := statuses[i]
 		if s == "" {
 			s = "-"
 		}
-		tableRows = append(tableRows, []string{row.Name, s, row.Repos, row.Created})
+		tableRows = append(tableRows, []string{rows[i].Name, s, rows[i].Repos, rows[i].Created})
 	}
 
 	fmt.Println(Table(headers, tableRows))
-	return nil
+	return statuses, nil
 }
 
 // FormatDuration formats a duration as a short human-readable string.

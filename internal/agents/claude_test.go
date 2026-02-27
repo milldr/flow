@@ -231,6 +231,61 @@ func TestSetupWorkspaceClaudeOverwritesGenerated(t *testing.T) {
 	}
 }
 
+func TestResetSharedAgent(t *testing.T) {
+	dir := t.TempDir()
+	agentsDir := filepath.Join(dir, "agents")
+
+	// First create defaults
+	if err := EnsureSharedAgent(agentsDir); err != nil {
+		t.Fatal(err)
+	}
+
+	// Modify a file to simulate user edits
+	claudeMD := filepath.Join(agentsDir, "claude", "CLAUDE.md")
+	if err := os.WriteFile(claudeMD, []byte("custom"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Reset should overwrite user edits
+	if err := ResetSharedAgent(agentsDir); err != nil {
+		t.Fatalf("ResetSharedAgent: %v", err)
+	}
+
+	data, err := os.ReadFile(claudeMD)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) == "custom" {
+		t.Error("ResetSharedAgent should have overwritten user-edited file")
+	}
+}
+
+func TestEnsureSymlinkReplacesRegularFile(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target")
+	link := filepath.Join(dir, "link")
+
+	if err := os.WriteFile(target, []byte("target"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Create a regular file where the symlink should be
+	if err := os.WriteFile(link, []byte("not a symlink"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ensureSymlink(target, link); err != nil {
+		t.Fatalf("ensureSymlink: %v", err)
+	}
+
+	got, err := os.Readlink(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != target {
+		t.Errorf("symlink target = %q, want %q", got, target)
+	}
+}
+
 func TestEnsureSymlinkRecreatesWrongTarget(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "target")
