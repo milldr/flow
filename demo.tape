@@ -74,4 +74,9 @@ Sleep 500ms
 Enter
 Sleep 5s
 
+Type "flow status api-refactor"
+Sleep 500ms
+Enter
+Sleep 4s
+
 Sleep 4s

@@ -43,7 +43,7 @@ Enter
 Sleep 4s
 
 # Show per-repo breakdown
-Type "flow status demo"
+Type "flow status api-refactor"
 Sleep 500ms
 Enter
 Sleep 4s

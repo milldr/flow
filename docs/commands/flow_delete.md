@@ -1,19 +1,20 @@
 ## flow delete
 
-Delete a workspace and its worktrees
+Delete one or more workspaces and their worktrees
 
 ![flow delete](tapes/delete.gif)
 
 
 ```
-flow delete <workspace> [flags]
+flow delete <workspace> [workspace...] [flags]
 ```
 
 ### Examples
 
 ```
   flow delete calm-delta
-  flow delete calm-delta --force
+  flow delete calm-delta warm-brook --force
+  flow delete ws1 ws2 ws3
 ```
 
 ### Options
