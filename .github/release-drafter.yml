@@ -23,6 +23,23 @@ categories:
   - title: "Other Changes"
     labels:
       - "*"
+autolabeler:
+  - label: "feature"
+    branch:
+      - "/^feat/"
+  - label: "fix"
+    branch:
+      - "/^fix/"
+      - "/^bugfix/"
+      - "/^hotfix/"
+  - label: "docs"
+    branch:
+      - "/^docs/"
+  - label: "enhancement"
+    branch:
+      - "/^improve/"
+      - "/^refactor/"
+      - "/^chore/"
 version-resolver:
   major:
     labels:

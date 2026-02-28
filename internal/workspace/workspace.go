@@ -234,8 +234,11 @@ func (s *Service) Render(ctx context.Context, id string, progress func(msg strin
 				if err != nil {
 					return fmt.Errorf("getting default branch for %s: %w", repo.URL, err)
 				}
-				s.log().Debug("creating worktree with new branch", "path", worktreePath, "branch", repo.Branch, "from", defaultBranch)
-				if err := s.Git.AddWorktreeNewBranch(ctx, barePath, worktreePath, repo.Branch, defaultBranch); err != nil {
+				// Use the remote ref to ensure we branch from the latest fetched state,
+				// not a potentially stale local branch ref in the bare repo.
+				startPoint := "origin/" + defaultBranch
+				s.log().Debug("creating worktree with new branch", "path", worktreePath, "branch", repo.Branch, "from", startPoint)
+				if err := s.Git.AddWorktreeNewBranch(ctx, barePath, worktreePath, repo.Branch, startPoint); err != nil {
 					return fmt.Errorf("creating worktree for %s: %w", repo.URL, err)
 				}
 				progress(fmt.Sprintf("      └── %s (%s, new branch from %s) ✓", repoPath, repo.Branch, defaultBranch))

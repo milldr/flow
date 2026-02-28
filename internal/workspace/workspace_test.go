@@ -15,10 +15,11 @@ import (
 
 // mockRunner records calls without executing git.
 type mockRunner struct {
-	clones    []string
-	fetches   []string
-	worktrees []string
-	removed   []string
+	clones      []string
+	fetches     []string
+	worktrees   []string
+	removed     []string
+	startPoints []string
 
 	cloneErr     error
 	fetchErr     error
@@ -47,7 +48,8 @@ func (m *mockRunner) AddWorktree(_ context.Context, _, worktreePath, _ string) e
 	return os.MkdirAll(worktreePath, 0o755)
 }
 
-func (m *mockRunner) AddWorktreeNewBranch(_ context.Context, _, worktreePath, _, _ string) error {
+func (m *mockRunner) AddWorktreeNewBranch(_ context.Context, _, worktreePath, _, startPoint string) error {
+	m.startPoints = append(m.startPoints, startPoint)
 	m.worktrees = append(m.worktrees, worktreePath)
 	if m.addWTErr != nil {
 		return m.addWTErr
@@ -412,6 +414,32 @@ func TestRenderAddWorktreeError(t *testing.T) {
 	err := svc.Render(ctx, "wt-fail", noop)
 	if err == nil {
 		t.Fatal("expected error from AddWorktree failure")
+	}
+}
+
+func TestRenderNewBranchUsesRemoteRef(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("Remote ref test", "Test new branch uses origin/ prefix", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/new-feature", Path: "./repo"},
+	})
+	if err := svc.Create("remote-ref", st); err != nil {
+		t.Fatal(err)
+	}
+
+	// branchExists=false triggers the new branch path
+	mock.branchExists = false
+	err := svc.Render(ctx, "remote-ref", noop)
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	if len(mock.startPoints) != 1 {
+		t.Fatalf("startPoints = %d, want 1", len(mock.startPoints))
+	}
+	if mock.startPoints[0] != "origin/main" {
+		t.Errorf("startPoint = %q, want origin/main", mock.startPoints[0])
 	}
 }
 
