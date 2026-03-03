@@ -105,6 +105,10 @@ func LoadWithFallback(workspacePath, globalPath string) (*Spec, error) {
 // branch name into $_default. It tries origin/HEAD first, then falls back to "main".
 const defaultBranchFragment = `_default=$(git -C "$FLOW_REPO_PATH" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||'); [ -z "$_default" ] && _default=main`
 
+// branchWasTrackedFragment checks if the branch was ever pushed (has tracking config).
+// Used to distinguish "branch was pushed and PR merged" from "stale PR with reused name".
+const branchWasTrackedFragment = `git -C "$FLOW_REPO_PATH" config "branch.$FLOW_REPO_BRANCH.remote" > /dev/null 2>&1`
+
 // DefaultSpec returns a starter status spec with a basic PR workflow.
 //
 // Status checks are evaluated top-to-bottom per repo; first match wins.
@@ -127,11 +131,11 @@ func DefaultSpec() *Spec {
 			Statuses: []Entry{
 				{
 					Name:        "closed",
-					Description: "Merged PR, no active branch divergence",
+					Description: "Merged PR, no open PRs, branch was pushed or no local divergence",
 					Color:       "131",
 					Check: `gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state merged --json number | jq -e 'length > 0' > /dev/null 2>&1` +
 						` && gh pr list --repo "$FLOW_REPO_SLUG" --head "$FLOW_REPO_BRANCH" --state open --json number | jq -e 'length == 0' > /dev/null 2>&1` +
-						` && ! { ` + defaultBranchFragment + `; git -C "$FLOW_REPO_PATH" log --oneline "origin/$_default..HEAD" 2>/dev/null | grep -q .; }`,
+						` && { ` + branchWasTrackedFragment + ` || ! { ` + defaultBranchFragment + `; git -C "$FLOW_REPO_PATH" log --oneline "origin/$_default..HEAD" 2>/dev/null | grep -q .; }; }`,
 				},
 				{
 					Name:        "stale",
