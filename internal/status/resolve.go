@@ -64,9 +64,15 @@ func buildEnv(repo RepoInfo, wsID, wsName string) []string {
 }
 
 // ResolveRepo determines the status of a single repo by evaluating checks
-// in order. Returns the name of the first matching status or the default.
+// in order. Returns the name of the first matching status, the default,
+// or empty string if the repo is skipped.
 func (r *Resolver) ResolveRepo(ctx context.Context, spec *Spec, repo RepoInfo, wsID, wsName string) string {
 	env := buildEnv(repo, wsID, wsName)
+
+	// If a skip check is defined and passes, exclude this repo from aggregation.
+	if spec.Spec.Skip != "" && r.Runner.RunCheck(ctx, spec.Spec.Skip, env) {
+		return ""
+	}
 
 	for _, entry := range spec.Spec.Statuses {
 		if entry.Default {

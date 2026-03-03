@@ -79,10 +79,29 @@ func (r *RealRunner) BareClone(ctx context.Context, url, dest string) error {
 	return r.run(ctx, "clone", "--bare", cloneURL, dest)
 }
 
-// Fetch fetches all refs in a bare repository.
+// Fetch fetches all refs in a bare repository and ensures the default branch
+// has a remote tracking ref so status checks can reference origin/main.
 func (r *RealRunner) Fetch(ctx context.Context, repoPath string) error {
 	r.log().Debug("fetching repository", "path", repoPath)
-	return r.run(ctx, "-C", repoPath, "fetch", "--all", "--prune")
+
+	if err := r.run(ctx, "-C", repoPath, "fetch", "--all", "--prune"); err != nil {
+		return err
+	}
+
+	// Create a remote tracking ref for the default branch so status checks
+	// can compare against origin/main (or origin/master). Bare clones store
+	// refs in refs/heads/ and don't create refs/remotes/origin/* by default.
+	// We only track the default branch to avoid case-conflict errors on
+	// macOS for repos with branches that differ only by casing.
+	defaultBranch, err := r.output(ctx, "-C", repoPath, "symbolic-ref", "--short", "HEAD")
+	if err == nil && defaultBranch != "" {
+		_ = r.run(ctx, "-C", repoPath, "fetch", "origin",
+			"+refs/heads/"+defaultBranch+":refs/remotes/origin/"+defaultBranch)
+		_ = r.run(ctx, "-C", repoPath, "symbolic-ref",
+			"refs/remotes/origin/HEAD", "refs/remotes/origin/"+defaultBranch)
+	}
+
+	return nil
 }
 
 // AddWorktree creates a worktree from a bare repo at the given path and branch.
