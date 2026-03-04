@@ -188,13 +188,18 @@ func runStatusWorkspace(ctx context.Context, svc *workspace.Service, cfg *config
 	ui.Printf("Status: %s  (%s)\n", ui.StatusStyle(result.Status, colorMap), ui.FormatDuration(result.Duration.Milliseconds()))
 
 	if len(result.Repos) > 0 {
-		headers := []string{"REPO", "BRANCH", "STATUS", "TIME"}
+		headers := []string{"REPO", "BRANCH", "STATUS", "UPDATED", "TIME"}
 		var rows [][]string
 		for _, r := range result.Repos {
+			updated := "-"
+			if !r.LastCommit.IsZero() {
+				updated = ui.RelativeTime(r.LastCommit)
+			}
 			rows = append(rows, []string{
 				status.RepoSlug(r.URL),
 				r.Branch,
 				ui.StatusStyle(r.Status, colorMap),
+				updated,
 				ui.FormatDuration(r.Duration.Milliseconds()),
 			})
 		}
