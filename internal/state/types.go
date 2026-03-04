@@ -26,6 +26,7 @@ type Spec struct {
 type Repo struct {
 	URL    string `yaml:"url"`
 	Branch string `yaml:"branch"`
+	Base   string `yaml:"base,omitempty"`
 	Path   string `yaml:"path,omitempty"`
 }
 

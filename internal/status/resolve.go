@@ -63,10 +63,30 @@ func buildEnv(repo RepoInfo, wsID, wsName string) []string {
 	}
 }
 
+// lastCommitTime returns the committer timestamp of the most recent commit in the repo.
+func lastCommitTime(ctx context.Context, repoPath string) time.Time {
+	ctx, cancel := context.WithTimeout(ctx, checkTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "log", "-1", "--format=%cI")
+	out, err := cmd.Output()
+	if err != nil {
+		return time.Time{}
+	}
+	t, _ := time.Parse(time.RFC3339, strings.TrimSpace(string(out)))
+	return t
+}
+
 // ResolveRepo determines the status of a single repo by evaluating checks
-// in order. Returns the name of the first matching status or the default.
+// in order. Returns the name of the first matching status, the default,
+// or empty string if the repo is skipped.
 func (r *Resolver) ResolveRepo(ctx context.Context, spec *Spec, repo RepoInfo, wsID, wsName string) string {
 	env := buildEnv(repo, wsID, wsName)
+
+	// If a skip check is defined and passes, exclude this repo from aggregation.
+	if spec.Spec.Skip != "" && r.Runner.RunCheck(ctx, spec.Spec.Skip, env) {
+		return ""
+	}
 
 	for _, entry := range spec.Spec.Statuses {
 		if entry.Default {
@@ -126,14 +146,16 @@ func (r *Resolver) ResolveWorkspace(ctx context.Context, spec *Spec, repos []Rep
 				skip = r.Runner.RunCheck(ctx, spec.Spec.Skip, env)
 			}
 
-			status := r.ResolveRepo(ctx, spec, rp, wsID, wsName)
+			st := r.ResolveRepo(ctx, spec, rp, wsID, wsName)
+			lc := lastCommitTime(ctx, rp.Path)
 			mu.Lock()
 			skipped[idx] = skip
 			result.Repos[idx] = RepoResult{
-				URL:      rp.URL,
-				Branch:   rp.Branch,
-				Status:   status,
-				Duration: time.Since(repoStart),
+				URL:        rp.URL,
+				Branch:     rp.Branch,
+				Status:     st,
+				Duration:   time.Since(repoStart),
+				LastCommit: lc,
 			}
 			mu.Unlock()
 		}(i, repo)
@@ -141,6 +163,13 @@ func (r *Resolver) ResolveWorkspace(ctx context.Context, spec *Spec, repos []Rep
 
 	wg.Wait()
 	result.Duration = time.Since(wsStart)
+
+	// Workspace last commit = most recent across all repos.
+	for _, rr := range result.Repos {
+		if rr.LastCommit.After(result.LastCommit) {
+			result.LastCommit = rr.LastCommit
+		}
+	}
 
 	// Build index map for ordering.
 	orderIndex := make(map[string]int, len(spec.Spec.Statuses))

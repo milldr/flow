@@ -83,10 +83,11 @@ type RepoInfo struct {
 
 // RepoResult holds the resolved status for a single repo.
 type RepoResult struct {
-	URL      string
-	Branch   string
-	Status   string
-	Duration time.Duration
+	URL        string
+	Branch     string
+	Status     string
+	Duration   time.Duration
+	LastCommit time.Time
 }
 
 // WorkspaceResult holds the resolved status for a workspace.
@@ -95,5 +96,6 @@ type WorkspaceResult struct {
 	WorkspaceName string
 	Status        string
 	Duration      time.Duration
+	LastCommit    time.Time
 	Repos         []RepoResult
 }

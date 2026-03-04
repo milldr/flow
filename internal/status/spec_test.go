@@ -204,6 +204,34 @@ func TestDefaultSpec(t *testing.T) {
 	}
 }
 
+func TestLoadWithSkipField(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "status.yaml")
+
+	spec := &Spec{
+		APIVersion: "flow/v1",
+		Kind:       "Status",
+		Spec: SpecBody{
+			Skip: `[ "$FLOW_REPO_BRANCH" = "main" ]`,
+			Statuses: []Entry{
+				{Name: "active", Check: "true"},
+				{Name: "open", Default: true},
+			},
+		},
+	}
+	if err := Save(path, spec); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if loaded.Spec.Skip != `[ "$FLOW_REPO_BRANCH" = "main" ]` {
+		t.Errorf("Skip = %q, want skip check command", loaded.Spec.Skip)
+	}
+}
+
 func TestSaveCreatesFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "new-status.yaml")

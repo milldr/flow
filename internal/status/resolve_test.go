@@ -95,6 +95,43 @@ func TestResolveRepoDefault(t *testing.T) {
 	}
 }
 
+func TestResolveRepoSkipped(t *testing.T) {
+	mock := &mockRunner{results: map[string]bool{
+		"skip-check":   true,
+		"check-closed": true,
+	}}
+	resolver := &Resolver{Runner: mock}
+
+	spec := testSpec()
+	spec.Spec.Skip = "skip-check"
+
+	repo := RepoInfo{URL: "github.com/org/repo", Branch: "main", Path: "./repo"}
+	status := resolver.ResolveRepo(context.Background(), spec, repo, "ws-1", "my-ws")
+
+	if status != "" {
+		t.Errorf("expected empty (skipped), got %q", status)
+	}
+}
+
+func TestResolveRepoSkipNotMatched(t *testing.T) {
+	mock := &mockRunner{results: map[string]bool{
+		"skip-check":   false,
+		"check-closed": false,
+		"check-review": true,
+	}}
+	resolver := &Resolver{Runner: mock}
+
+	spec := testSpec()
+	spec.Spec.Skip = "skip-check"
+
+	repo := RepoInfo{URL: "github.com/org/repo", Branch: "feat/x", Path: "./repo"}
+	status := resolver.ResolveRepo(context.Background(), spec, repo, "ws-1", "my-ws")
+
+	if status != "in-review" {
+		t.Errorf("expected in-review, got %q", status)
+	}
+}
+
 func TestResolveWorkspaceSingleRepo(t *testing.T) {
 	mock := &mockRunner{results: map[string]bool{
 		"check-closed":   false,
