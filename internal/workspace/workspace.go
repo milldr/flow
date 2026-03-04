@@ -230,18 +230,23 @@ func (s *Service) Render(ctx context.Context, id string, progress func(msg strin
 				}
 				progress(fmt.Sprintf("      └── %s (%s) ✓", repoPath, repo.Branch))
 			} else {
-				defaultBranch, err := s.Git.DefaultBranch(ctx, barePath)
-				if err != nil {
-					return fmt.Errorf("getting default branch for %s: %w", repo.URL, err)
+				var baseBranch string
+				if repo.Base != "" {
+					baseBranch = repo.Base
+				} else {
+					baseBranch, err = s.Git.DefaultBranch(ctx, barePath)
+					if err != nil {
+						return fmt.Errorf("getting default branch for %s: %w", repo.URL, err)
+					}
 				}
 				// Use the remote ref to ensure we branch from the latest fetched state,
 				// not a potentially stale local branch ref in the bare repo.
-				startPoint := "origin/" + defaultBranch
+				startPoint := "origin/" + baseBranch
 				s.log().Debug("creating worktree with new branch", "path", worktreePath, "branch", repo.Branch, "from", startPoint)
 				if err := s.Git.AddWorktreeNewBranch(ctx, barePath, worktreePath, repo.Branch, startPoint); err != nil {
 					return fmt.Errorf("creating worktree for %s: %w", repo.URL, err)
 				}
-				progress(fmt.Sprintf("      └── %s (%s, new branch from %s) ✓", repoPath, repo.Branch, defaultBranch))
+				progress(fmt.Sprintf("      └── %s (%s, new branch from %s) ✓", repoPath, repo.Branch, baseBranch))
 			}
 		} else {
 			s.log().Debug("worktree already exists, skipping", "path", worktreePath)
@@ -255,6 +260,89 @@ func (s *Service) Render(ctx context.Context, id string, progress func(msg strin
 	}
 
 	return nil
+}
+
+// Sync fetches and rebases worktrees onto their base branches.
+// It continues through failures — one repo failing doesn't block others.
+func (s *Service) Sync(ctx context.Context, id string, progress func(msg string)) error {
+	st, err := s.Find(id)
+	if err != nil {
+		return err
+	}
+
+	if err := state.Validate(st); err != nil {
+		return fmt.Errorf("invalid state: %w", err)
+	}
+
+	wsDir := s.Config.WorkspacePath(id)
+	total := len(st.Spec.Repos)
+	var errs []error
+
+	for i, repo := range st.Spec.Repos {
+		repoPath := state.RepoPath(repo)
+		barePath := s.Config.BareRepoPath(repo.URL)
+		worktreePath := filepath.Join(wsDir, repoPath)
+
+		progress(fmt.Sprintf("[%d/%d] %s", i+1, total, repo.URL))
+
+		// Skip if worktree doesn't exist
+		if _, err := os.Stat(worktreePath); os.IsNotExist(err) {
+			progress(fmt.Sprintf("      └── %s skipped (not rendered)", repoPath))
+			continue
+		}
+
+		// Fetch bare repo
+		if err := s.Git.Fetch(ctx, barePath); err != nil {
+			errs = append(errs, fmt.Errorf("%s: fetch: %w", repoPath, err))
+			progress(fmt.Sprintf("      └── %s fetch failed", repoPath))
+			continue
+		}
+
+		// Resolve base branch
+		var baseBranch string
+		if repo.Base != "" {
+			baseBranch = repo.Base
+		} else {
+			baseBranch, err = s.Git.DefaultBranch(ctx, barePath)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("%s: default branch: %w", repoPath, err))
+				progress(fmt.Sprintf("      └── %s failed to resolve base branch", repoPath))
+				continue
+			}
+		}
+
+		// Ensure remote ref so origin/{base} resolves from worktrees
+		if err := s.Git.EnsureRemoteRef(ctx, barePath, baseBranch); err != nil {
+			errs = append(errs, fmt.Errorf("%s: ensure remote ref: %w", repoPath, err))
+			progress(fmt.Sprintf("      └── %s failed to ensure remote ref", repoPath))
+			continue
+		}
+
+		// Check clean
+		clean, err := s.Git.IsClean(ctx, worktreePath)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("%s: checking clean: %w", repoPath, err))
+			progress(fmt.Sprintf("      └── %s failed to check status", repoPath))
+			continue
+		}
+		if !clean {
+			progress(fmt.Sprintf("      └── %s skipped (dirty worktree)", repoPath))
+			continue
+		}
+
+		// Rebase onto origin/{base}
+		onto := "origin/" + baseBranch
+		if err := s.Git.Rebase(ctx, worktreePath, onto); err != nil {
+			_ = s.Git.RebaseAbort(ctx, worktreePath)
+			errs = append(errs, fmt.Errorf("%s: rebase onto %s: %w", repoPath, onto, err))
+			progress(fmt.Sprintf("      └── %s rebase failed (aborted)", repoPath))
+			continue
+		}
+
+		progress(fmt.Sprintf("      └── %s rebased onto %s ✓", repoPath, onto))
+	}
+
+	return errors.Join(errs...)
 }
 
 // Delete removes all worktrees and the workspace directory.

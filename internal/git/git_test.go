@@ -218,3 +218,100 @@ func TestAddWorktreeNewBranch(t *testing.T) {
 		t.Error("expected feat/test branch to exist")
 	}
 }
+
+func TestIsClean(t *testing.T) {
+	bare := initTestRepo(t)
+	r := &RealRunner{}
+	ctx := context.Background()
+	wtPath := filepath.Join(t.TempDir(), "wt-clean")
+
+	if err := r.AddWorktree(ctx, bare, wtPath, "main"); err != nil {
+		t.Fatalf("AddWorktree: %v", err)
+	}
+
+	// Should be clean initially
+	clean, err := r.IsClean(ctx, wtPath)
+	if err != nil {
+		t.Fatalf("IsClean: %v", err)
+	}
+	if !clean {
+		t.Error("expected worktree to be clean")
+	}
+
+	// Modify a file — should be dirty
+	if err := os.WriteFile(filepath.Join(wtPath, "dirty.txt"), []byte("dirty"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	clean, err = r.IsClean(ctx, wtPath)
+	if err != nil {
+		t.Fatalf("IsClean (dirty): %v", err)
+	}
+	if clean {
+		t.Error("expected worktree to be dirty")
+	}
+}
+
+func TestRebase(t *testing.T) {
+	bare := initTestRepo(t)
+	r := &RealRunner{}
+	ctx := context.Background()
+
+	// Create a worktree with a new branch
+	wtPath := filepath.Join(t.TempDir(), "wt-rebase")
+	if err := r.AddWorktreeNewBranch(ctx, bare, wtPath, "feat/rebase-test", "main"); err != nil {
+		t.Fatalf("AddWorktreeNewBranch: %v", err)
+	}
+
+	// Add a commit on main via a separate worktree
+	mainWt := filepath.Join(t.TempDir(), "wt-main")
+	if err := r.AddWorktree(ctx, bare, mainWt, "main"); err != nil {
+		t.Fatalf("AddWorktree main: %v", err)
+	}
+	gitCmd := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@test.com",
+			"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@test.com",
+		)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(mainWt, "new.txt"), []byte("new"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitCmd(mainWt, "add", ".")
+	gitCmd(mainWt, "commit", "-m", "new commit on main")
+
+	// Rebase feature branch onto main
+	if err := r.Rebase(ctx, wtPath, "main"); err != nil {
+		t.Fatalf("Rebase: %v", err)
+	}
+
+	// The new file should now be in the feature branch worktree
+	if _, err := os.Stat(filepath.Join(wtPath, "new.txt")); err != nil {
+		t.Error("expected new.txt after rebase")
+	}
+}
+
+func TestEnsureRemoteRef(t *testing.T) {
+	bare := initTestRepo(t)
+	r := &RealRunner{}
+	ctx := context.Background()
+
+	// After EnsureRemoteRef, origin/main should resolve
+	if err := r.EnsureRemoteRef(ctx, bare, "main"); err != nil {
+		t.Fatalf("EnsureRemoteRef: %v", err)
+	}
+
+	// Verify the ref exists by rev-parsing it
+	out, err := r.output(ctx, "-C", bare, "rev-parse", "refs/remotes/origin/main")
+	if err != nil {
+		t.Fatalf("rev-parse origin/main: %v", err)
+	}
+	if out == "" {
+		t.Error("expected origin/main ref to exist")
+	}
+}

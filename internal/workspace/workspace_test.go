@@ -20,11 +20,16 @@ type mockRunner struct {
 	worktrees   []string
 	removed     []string
 	startPoints []string
+	remoteRefs  []string
+	rebases     []string
+	aborts      []string
 
 	cloneErr     error
 	fetchErr     error
 	addWTErr     error
 	branchExists bool
+	isClean      bool
+	rebaseErr    error
 }
 
 func (m *mockRunner) BareClone(_ context.Context, url, dest string) error {
@@ -68,6 +73,25 @@ func (m *mockRunner) BranchExists(_ context.Context, _, _ string) (bool, error) 
 
 func (m *mockRunner) DefaultBranch(_ context.Context, _ string) (string, error) {
 	return "main", nil
+}
+
+func (m *mockRunner) EnsureRemoteRef(_ context.Context, _, branch string) error {
+	m.remoteRefs = append(m.remoteRefs, branch)
+	return nil
+}
+
+func (m *mockRunner) IsClean(_ context.Context, _ string) (bool, error) {
+	return m.isClean, nil
+}
+
+func (m *mockRunner) Rebase(_ context.Context, _, onto string) error {
+	m.rebases = append(m.rebases, onto)
+	return m.rebaseErr
+}
+
+func (m *mockRunner) RebaseAbort(_ context.Context, worktreePath string) error {
+	m.aborts = append(m.aborts, worktreePath)
+	return nil
 }
 
 func testService(t *testing.T) (*Service, *mockRunner) {
@@ -443,6 +467,32 @@ func TestRenderNewBranchUsesRemoteRef(t *testing.T) {
 	}
 }
 
+func TestRenderNewBranchUsesBaseField(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("Base field test", "Test new branch uses configured base", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/new-feature", Base: "develop", Path: "./repo"},
+	})
+	if err := svc.Create("base-field", st); err != nil {
+		t.Fatal(err)
+	}
+
+	// branchExists=false triggers the new branch path
+	mock.branchExists = false
+	err := svc.Render(ctx, "base-field", noop)
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	if len(mock.startPoints) != 1 {
+		t.Fatalf("startPoints = %d, want 1", len(mock.startPoints))
+	}
+	if mock.startPoints[0] != "origin/develop" {
+		t.Errorf("startPoint = %q, want origin/develop", mock.startPoints[0])
+	}
+}
+
 func TestRenderNotFound(t *testing.T) {
 	svc, _ := testService(t)
 	ctx := context.Background()
@@ -767,5 +817,173 @@ func TestRenderCreatesClaudeFiles(t *testing.T) {
 	expected = filepath.Join(svc.Config.AgentsDir, "claude", "skills")
 	if target != expected {
 		t.Errorf(".claude/skills target = %q, want %q", target, expected)
+	}
+}
+
+func TestSyncCleanRebase(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("sync-clean", "Sync clean test", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/x", Path: "./repo"},
+	})
+	if err := svc.Create("sync-clean", st); err != nil {
+		t.Fatal(err)
+	}
+	// Render to create worktree directory
+	if err := svc.Render(ctx, "sync-clean", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.fetches = nil
+	mock.isClean = true
+	if err := svc.Sync(ctx, "sync-clean", noop); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	if len(mock.fetches) != 1 {
+		t.Errorf("fetches = %d, want 1", len(mock.fetches))
+	}
+	if len(mock.remoteRefs) != 1 || mock.remoteRefs[0] != "main" {
+		t.Errorf("remoteRefs = %v, want [main]", mock.remoteRefs)
+	}
+	if len(mock.rebases) != 1 || mock.rebases[0] != "origin/main" {
+		t.Errorf("rebases = %v, want [origin/main]", mock.rebases)
+	}
+}
+
+func TestSyncDirtySkip(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("sync-dirty", "Sync dirty test", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/x", Path: "./repo"},
+	})
+	if err := svc.Create("sync-dirty", st); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Render(ctx, "sync-dirty", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.fetches = nil
+	mock.isClean = false
+	if err := svc.Sync(ctx, "sync-dirty", noop); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	if len(mock.rebases) != 0 {
+		t.Errorf("rebases = %d, want 0 (dirty worktree should skip)", len(mock.rebases))
+	}
+}
+
+func TestSyncUsesBaseField(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("sync-base", "Sync base field test", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/x", Base: "develop", Path: "./repo"},
+	})
+	if err := svc.Create("sync-base", st); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Render(ctx, "sync-base", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.fetches = nil
+	mock.isClean = true
+	if err := svc.Sync(ctx, "sync-base", noop); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	if len(mock.remoteRefs) != 1 || mock.remoteRefs[0] != "develop" {
+		t.Errorf("remoteRefs = %v, want [develop]", mock.remoteRefs)
+	}
+	if len(mock.rebases) != 1 || mock.rebases[0] != "origin/develop" {
+		t.Errorf("rebases = %v, want [origin/develop]", mock.rebases)
+	}
+}
+
+func TestSyncNoWorktreeSkip(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("sync-nowt", "Sync no worktree test", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/x", Path: "./repo"},
+	})
+	if err := svc.Create("sync-nowt", st); err != nil {
+		t.Fatal(err)
+	}
+	// Don't render — worktree doesn't exist
+
+	if err := svc.Sync(ctx, "sync-nowt", noop); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	if len(mock.fetches) != 0 {
+		t.Errorf("fetches = %d, want 0 (no worktree to sync)", len(mock.fetches))
+	}
+	if len(mock.rebases) != 0 {
+		t.Errorf("rebases = %d, want 0", len(mock.rebases))
+	}
+}
+
+func TestSyncRebaseError(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("sync-fail", "Sync rebase fail test", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/x", Path: "./repo"},
+	})
+	if err := svc.Create("sync-fail", st); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Render(ctx, "sync-fail", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.fetches = nil
+	mock.isClean = true
+	mock.rebaseErr = errors.New("conflict")
+
+	err := svc.Sync(ctx, "sync-fail", noop)
+	if err == nil {
+		t.Fatal("expected error from rebase failure")
+	}
+
+	if len(mock.aborts) != 1 {
+		t.Errorf("aborts = %d, want 1 (should abort failed rebase)", len(mock.aborts))
+	}
+}
+
+func TestSyncMultiRepos(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("sync-multi", "Sync multi repos", []state.Repo{
+		{URL: "github.com/org/repo-a", Branch: "feat/a", Path: "./repo-a"},
+		{URL: "github.com/org/repo-b", Branch: "feat/b", Path: "./repo-b"},
+		{URL: "github.com/org/repo-c", Branch: "feat/c", Path: "./repo-c"},
+	})
+	if err := svc.Create("sync-multi", st); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Render(ctx, "sync-multi", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.fetches = nil
+	mock.isClean = true
+
+	if err := svc.Sync(ctx, "sync-multi", noop); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	if len(mock.fetches) != 3 {
+		t.Errorf("fetches = %d, want 3", len(mock.fetches))
+	}
+	if len(mock.rebases) != 3 {
+		t.Errorf("rebases = %d, want 3", len(mock.rebases))
 	}
 }

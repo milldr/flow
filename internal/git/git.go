@@ -20,6 +20,10 @@ type Runner interface {
 	RemoveWorktree(ctx context.Context, bareRepo, worktreePath string) error
 	BranchExists(ctx context.Context, bareRepo, branch string) (bool, error)
 	DefaultBranch(ctx context.Context, bareRepo string) (string, error)
+	EnsureRemoteRef(ctx context.Context, bareRepo, branch string) error
+	IsClean(ctx context.Context, worktreePath string) (bool, error)
+	Rebase(ctx context.Context, worktreePath, onto string) error
+	RebaseAbort(ctx context.Context, worktreePath string) error
 }
 
 // RealRunner shells out to the git binary.
@@ -140,4 +144,34 @@ func (r *RealRunner) DefaultBranch(ctx context.Context, bareRepo string) (string
 		return "", fmt.Errorf("determining default branch: %w", err)
 	}
 	return out, nil
+}
+
+// EnsureRemoteRef creates refs/remotes/origin/{branch} in a bare repo so
+// origin/{branch} resolves from worktrees.
+func (r *RealRunner) EnsureRemoteRef(ctx context.Context, bareRepo, branch string) error {
+	r.log().Debug("ensuring remote ref", "bare_repo", bareRepo, "branch", branch)
+	return r.run(ctx, "-C", bareRepo, "fetch", "origin",
+		"+refs/heads/"+branch+":refs/remotes/origin/"+branch)
+}
+
+// IsClean returns true if the worktree has no uncommitted changes.
+func (r *RealRunner) IsClean(ctx context.Context, worktreePath string) (bool, error) {
+	r.log().Debug("checking worktree cleanliness", "path", worktreePath)
+	out, err := r.output(ctx, "-C", worktreePath, "status", "--porcelain")
+	if err != nil {
+		return false, err
+	}
+	return out == "", nil
+}
+
+// Rebase rebases the current branch onto the given ref.
+func (r *RealRunner) Rebase(ctx context.Context, worktreePath, onto string) error {
+	r.log().Debug("rebasing", "path", worktreePath, "onto", onto)
+	return r.run(ctx, "-C", worktreePath, "rebase", onto)
+}
+
+// RebaseAbort aborts a rebase in progress.
+func (r *RealRunner) RebaseAbort(ctx context.Context, worktreePath string) error {
+	r.log().Debug("aborting rebase", "path", worktreePath)
+	return r.run(ctx, "-C", worktreePath, "rebase", "--abort")
 }

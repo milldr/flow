@@ -95,6 +95,7 @@ func newRootCmd() *cobra.Command {
 	root.AddCommand(newOpenCmd(svc))
 	root.AddCommand(newDeleteCmd(svc))
 	root.AddCommand(newResetCmd(svc, cfg))
+	root.AddCommand(newSyncCmd(svc))
 
 	return root
 }
