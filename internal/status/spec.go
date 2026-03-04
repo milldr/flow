@@ -127,6 +127,7 @@ func DefaultSpec() *Spec {
 		Kind:       "Status",
 		Spec: SpecBody{
 			Skip: `_default=$(git -C "$FLOW_REPO_PATH" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||')
+[ -z "$_default" ] && _default=$(git -C "$FLOW_REPO_PATH" ls-remote --symref origin HEAD 2>/dev/null | awk '/^ref:/ { sub("refs/heads/", "", $2); print $2 }')
 [ -n "$_default" ] && [ "$FLOW_REPO_BRANCH" = "$_default" ]`,
 			Statuses: []Entry{
 				{
