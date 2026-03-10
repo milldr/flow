@@ -209,6 +209,11 @@ func (s *Service) Render(ctx context.Context, id string, progress func(msg strin
 			if err := s.Git.BareClone(ctx, repo.URL, barePath); err != nil {
 				return fmt.Errorf("cloning %s: %w", repo.URL, err)
 			}
+			// Fetch after bare clone to create remote tracking refs
+			// (bare clones don't create refs/remotes/origin/* by default).
+			if err := s.Git.Fetch(ctx, barePath); err != nil {
+				return fmt.Errorf("fetching %s: %w", repo.URL, err)
+			}
 		} else {
 			s.log().Debug("bare clone exists, fetching", "url", repo.URL, "path", barePath)
 			if err := s.Git.Fetch(ctx, barePath); err != nil {
@@ -238,6 +243,12 @@ func (s *Service) Render(ctx context.Context, id string, progress func(msg strin
 					if err != nil {
 						return fmt.Errorf("getting default branch for %s: %w", repo.URL, err)
 					}
+				}
+				// Ensure the remote tracking ref exists for the base branch so
+				// origin/{baseBranch} resolves (especially when baseBranch differs
+				// from the default branch, which Fetch only creates refs for).
+				if err := s.Git.EnsureRemoteRef(ctx, barePath, baseBranch); err != nil {
+					return fmt.Errorf("ensuring remote ref for %s: %w", repo.URL, err)
 				}
 				// Use the remote ref to ensure we branch from the latest fetched state,
 				// not a potentially stale local branch ref in the bare repo.
