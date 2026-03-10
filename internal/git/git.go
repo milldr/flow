@@ -109,9 +109,11 @@ func (r *RealRunner) Fetch(ctx context.Context, repoPath string) error {
 }
 
 // AddWorktree creates a worktree from a bare repo at the given path and branch.
+// Uses --force to allow the same branch to be checked out in multiple worktrees
+// across different workspaces.
 func (r *RealRunner) AddWorktree(ctx context.Context, bareRepo, worktreePath, branch string) error {
 	r.log().Debug("adding worktree", "bare_repo", bareRepo, "worktree", worktreePath, "branch", branch)
-	return r.run(ctx, "-C", bareRepo, "worktree", "add", worktreePath, branch)
+	return r.run(ctx, "-C", bareRepo, "worktree", "add", "--force", worktreePath, branch)
 }
 
 // AddWorktreeNewBranch creates a worktree with a new branch starting from startPoint.
