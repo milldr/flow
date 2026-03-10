@@ -465,6 +465,10 @@ func TestRenderNewBranchUsesRemoteRef(t *testing.T) {
 	if mock.startPoints[0] != "origin/main" {
 		t.Errorf("startPoint = %q, want origin/main", mock.startPoints[0])
 	}
+	// EnsureRemoteRef should be called for the base branch during render
+	if len(mock.remoteRefs) != 1 || mock.remoteRefs[0] != "main" {
+		t.Errorf("remoteRefs = %v, want [main]", mock.remoteRefs)
+	}
 }
 
 func TestRenderNewBranchUsesBaseField(t *testing.T) {
@@ -836,6 +840,7 @@ func TestSyncCleanRebase(t *testing.T) {
 	}
 
 	mock.fetches = nil
+	mock.remoteRefs = nil
 	mock.isClean = true
 	if err := svc.Sync(ctx, "sync-clean", noop); err != nil {
 		t.Fatalf("Sync: %v", err)
@@ -892,6 +897,7 @@ func TestSyncUsesBaseField(t *testing.T) {
 	}
 
 	mock.fetches = nil
+	mock.remoteRefs = nil
 	mock.isClean = true
 	if err := svc.Sync(ctx, "sync-base", noop); err != nil {
 		t.Fatalf("Sync: %v", err)
