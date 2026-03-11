@@ -21,6 +21,7 @@ type Runner interface {
 	BranchExists(ctx context.Context, bareRepo, branch string) (bool, error)
 	DefaultBranch(ctx context.Context, bareRepo string) (string, error)
 	EnsureRemoteRef(ctx context.Context, bareRepo, branch string) error
+	ResetBranch(ctx context.Context, worktreePath, ref string) error
 	IsClean(ctx context.Context, worktreePath string) (bool, error)
 	Rebase(ctx context.Context, worktreePath, onto string) error
 	RebaseAbort(ctx context.Context, worktreePath string) error
@@ -154,6 +155,13 @@ func (r *RealRunner) EnsureRemoteRef(ctx context.Context, bareRepo, branch strin
 	r.log().Debug("ensuring remote ref", "bare_repo", bareRepo, "branch", branch)
 	return r.run(ctx, "-C", bareRepo, "fetch", "origin",
 		"+refs/heads/"+branch+":refs/remotes/origin/"+branch)
+}
+
+// ResetBranch resets the current branch in a worktree to the given ref.
+// This is used to fast-forward existing worktrees to the latest remote state.
+func (r *RealRunner) ResetBranch(ctx context.Context, worktreePath, ref string) error {
+	r.log().Debug("resetting branch", "path", worktreePath, "ref", ref)
+	return r.run(ctx, "-C", worktreePath, "reset", "--hard", ref)
 }
 
 // IsClean returns true if the worktree has no uncommitted changes.
