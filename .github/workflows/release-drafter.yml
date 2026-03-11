@@ -25,5 +25,7 @@ jobs:
         run: sleep 10
 
       - uses: release-drafter/release-drafter@v6
+        with:
+          publish: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
