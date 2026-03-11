@@ -320,20 +320,70 @@ func (s *Service) createWorktree(ctx context.Context, rc *repoRenderContext, pro
 	return nil
 }
 
-// updateWorktree resets an existing worktree to the latest remote ref for its
-// branch so that re-rendering always picks up new upstream commits.
+// updateWorktree checks for branch drift and either switches branches or
+// updates the existing worktree to the latest remote ref.
 func (s *Service) updateWorktree(ctx context.Context, rc *repoRenderContext, progress func(msg string)) error {
-	// Ensure the remote tracking ref exists for this branch so we can
-	// check if the branch exists on the remote.
+	currentBranch, err := s.Git.CurrentBranch(ctx, rc.worktreePath)
+	if err != nil {
+		return fmt.Errorf("getting current branch for %s: %w", rc.repo.URL, err)
+	}
+
+	if currentBranch != rc.repo.Branch {
+		return s.switchWorktreeBranch(ctx, rc, currentBranch, progress)
+	}
+
+	return s.updateWorktreeRemote(ctx, rc, progress)
+}
+
+// switchWorktreeBranch handles the case where state.yaml specifies a different
+// branch than what's currently checked out in the worktree.
+func (s *Service) switchWorktreeBranch(ctx context.Context, rc *repoRenderContext, currentBranch string, progress func(msg string)) error {
+	clean, err := s.Git.IsClean(ctx, rc.worktreePath)
+	if err != nil {
+		return fmt.Errorf("checking worktree status for %s: %w", rc.repo.URL, err)
+	}
+	if !clean {
+		s.log().Debug("worktree is dirty, cannot switch branch", "path", rc.worktreePath, "from", currentBranch, "to", rc.repo.Branch)
+		progress(fmt.Sprintf("      └── %s (%s → %s) dirty, cannot switch branch", rc.repoPath, currentBranch, rc.repo.Branch))
+		return nil
+	}
+
+	exists, err := s.Git.BranchExists(ctx, rc.barePath, rc.repo.Branch)
+	if err != nil {
+		return fmt.Errorf("checking branch for %s: %w", rc.repo.URL, err)
+	}
+
+	if exists {
+		if err := s.Git.CheckoutBranch(ctx, rc.worktreePath, rc.repo.Branch); err != nil {
+			return fmt.Errorf("switching branch for %s: %w", rc.repo.URL, err)
+		}
+		progress(fmt.Sprintf("      └── %s (%s → %s) switched ✓", rc.repoPath, currentBranch, rc.repo.Branch))
+	} else {
+		baseBranch, err := s.resolveBaseBranch(ctx, rc)
+		if err != nil {
+			return err
+		}
+		if err := s.Git.EnsureRemoteRef(ctx, rc.barePath, baseBranch); err != nil {
+			return fmt.Errorf("ensuring remote ref for %s: %w", rc.repo.URL, err)
+		}
+		startPoint := "origin/" + baseBranch
+		if err := s.Git.CheckoutNewBranch(ctx, rc.worktreePath, rc.repo.Branch, startPoint); err != nil {
+			return fmt.Errorf("creating branch for %s: %w", rc.repo.URL, err)
+		}
+		progress(fmt.Sprintf("      └── %s (%s → %s, new branch from %s) switched ✓", rc.repoPath, currentBranch, rc.repo.Branch, baseBranch))
+	}
+
+	return s.updateWorktreeRemote(ctx, rc, progress)
+}
+
+// updateWorktreeRemote updates an existing worktree to the latest remote ref.
+func (s *Service) updateWorktreeRemote(ctx context.Context, rc *repoRenderContext, progress func(msg string)) error {
 	if err := s.Git.EnsureRemoteRef(ctx, rc.barePath, rc.repo.Branch); err != nil {
-		// Branch doesn't exist on remote — this is a local-only feature
-		// branch. Leave it alone.
 		s.log().Debug("worktree exists, no remote branch to update from", "path", rc.worktreePath, "branch", rc.repo.Branch)
 		progress(fmt.Sprintf("      └── %s (%s) exists", rc.repoPath, rc.repo.Branch))
 		return nil
 	}
 
-	// Check if the worktree is clean before resetting
 	clean, err := s.Git.IsClean(ctx, rc.worktreePath)
 	if err != nil {
 		return fmt.Errorf("checking worktree status for %s: %w", rc.repo.URL, err)
@@ -345,7 +395,6 @@ func (s *Service) updateWorktree(ctx context.Context, rc *repoRenderContext, pro
 		return nil
 	}
 
-	// Reset to the latest remote ref
 	ref := "origin/" + rc.repo.Branch
 	s.log().Debug("updating worktree to latest remote", "path", rc.worktreePath, "ref", ref)
 	if err := s.Git.ResetBranch(ctx, rc.worktreePath, ref); err != nil {

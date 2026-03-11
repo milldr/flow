@@ -27,14 +27,16 @@ type mockRunner struct {
 	resets      []string
 	rebases     []string
 	aborts      []string
+	checkouts   []string
 
-	cloneErr     error
-	fetchErr     error
-	addWTErr     error
-	branchExists bool
-	isClean      bool
-	rebaseErr    error
-	resetErr     error
+	cloneErr      error
+	fetchErr      error
+	addWTErr      error
+	branchExists  bool
+	isClean       bool
+	rebaseErr     error
+	resetErr      error
+	currentBranch string
 }
 
 func (m *mockRunner) BareClone(_ context.Context, url, dest string) error {
@@ -128,6 +130,32 @@ func (m *mockRunner) Rebase(_ context.Context, _, onto string) error {
 func (m *mockRunner) RebaseAbort(_ context.Context, worktreePath string) error {
 	m.mu.Lock()
 	m.aborts = append(m.aborts, worktreePath)
+	m.mu.Unlock()
+	return nil
+}
+
+func (m *mockRunner) CurrentBranch(_ context.Context, _ string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.currentBranch == "" {
+		return "main", nil
+	}
+	return m.currentBranch, nil
+}
+
+func (m *mockRunner) CheckoutBranch(_ context.Context, _, branch string) error {
+	m.mu.Lock()
+	m.checkouts = append(m.checkouts, branch)
+	m.currentBranch = branch
+	m.mu.Unlock()
+	return nil
+}
+
+func (m *mockRunner) CheckoutNewBranch(_ context.Context, _, newBranch, startPoint string) error {
+	m.mu.Lock()
+	m.checkouts = append(m.checkouts, newBranch)
+	m.startPoints = append(m.startPoints, startPoint)
+	m.currentBranch = newBranch
 	m.mu.Unlock()
 	return nil
 }
@@ -243,7 +271,7 @@ func TestRender(t *testing.T) {
 
 	st := state.NewState("Render test", "Render test", []state.Repo{
 		{URL: "github.com/org/repo-a", Branch: "main", Path: "./repo-a"},
-		{URL: "github.com/org/repo-b", Branch: "feat/x", Path: "./repo-b"},
+		{URL: "github.com/org/repo-b", Branch: "main", Path: "./repo-b"},
 	})
 
 	if err := svc.Create("render-ws", st); err != nil {
@@ -272,6 +300,7 @@ func TestRender(t *testing.T) {
 	mock.remoteRefs = nil
 	mock.resets = nil
 	mock.isClean = true
+	mock.currentBranch = "main"
 	err = svc.Render(ctx, "render-ws", noop)
 	if err != nil {
 		t.Fatalf("Render (2nd): %v", err)
@@ -445,6 +474,7 @@ func TestRenderExistingWorktreeDirtySkip(t *testing.T) {
 	// Second render with dirty worktree should skip reset
 	mock.resets = nil
 	mock.isClean = false
+	mock.currentBranch = "main"
 	var messages []string
 	err := svc.Render(ctx, "dirty-ws", func(msg string) { messages = append(messages, msg) })
 	if err != nil {
@@ -939,6 +969,190 @@ func TestRenderCreatesClaudeFiles(t *testing.T) {
 	expected = filepath.Join(svc.Config.AgentsDir, "claude", "skills")
 	if target != expected {
 		t.Errorf(".claude/skills target = %q, want %q", target, expected)
+	}
+}
+
+func TestRenderBranchSwitchExistingBranch(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("Branch switch test", "Branch switch existing", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/old", Path: "./repo"},
+	})
+	if err := svc.Create("branch-switch", st); err != nil {
+		t.Fatal(err)
+	}
+
+	// First render creates worktree on feat/old
+	mock.branchExists = true
+	if err := svc.Render(ctx, "branch-switch", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	// Change the branch in state and re-render
+	st.Spec.Repos[0].Branch = "feat/new"
+	if err := state.Save(svc.Config.StatePath("branch-switch"), st); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.checkouts = nil
+	mock.currentBranch = "feat/old"
+	mock.isClean = true
+	mock.branchExists = true
+
+	var messages []string
+	err := svc.Render(ctx, "branch-switch", func(msg string) { messages = append(messages, msg) })
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	if len(mock.checkouts) != 1 || mock.checkouts[0] != "feat/new" {
+		t.Errorf("checkouts = %v, want [feat/new]", mock.checkouts)
+	}
+
+	found := false
+	for _, msg := range messages {
+		if strings.Contains(msg, "switched") && strings.Contains(msg, "feat/old") && strings.Contains(msg, "feat/new") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected progress message about branch switch, got %v", messages)
+	}
+}
+
+func TestRenderBranchSwitchNewBranch(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("Branch switch new", "Branch switch new branch", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/old", Path: "./repo"},
+	})
+	if err := svc.Create("branch-new", st); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.branchExists = true
+	if err := svc.Render(ctx, "branch-new", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	// Change to a branch that doesn't exist
+	st.Spec.Repos[0].Branch = "feat/brand-new"
+	if err := state.Save(svc.Config.StatePath("branch-new"), st); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.checkouts = nil
+	mock.startPoints = nil
+	mock.currentBranch = "feat/old"
+	mock.isClean = true
+	mock.branchExists = false
+
+	var messages []string
+	err := svc.Render(ctx, "branch-new", func(msg string) { messages = append(messages, msg) })
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	if len(mock.checkouts) != 1 || mock.checkouts[0] != "feat/brand-new" {
+		t.Errorf("checkouts = %v, want [feat/brand-new]", mock.checkouts)
+	}
+	if len(mock.startPoints) != 1 || mock.startPoints[0] != "origin/main" {
+		t.Errorf("startPoints = %v, want [origin/main]", mock.startPoints)
+	}
+
+	found := false
+	for _, msg := range messages {
+		if strings.Contains(msg, "new branch from main") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected progress message about new branch, got %v", messages)
+	}
+}
+
+func TestRenderBranchSwitchDirtySkip(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("Branch switch dirty", "Branch switch dirty skip", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/old", Path: "./repo"},
+	})
+	if err := svc.Create("branch-dirty", st); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.branchExists = true
+	if err := svc.Render(ctx, "branch-dirty", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	st.Spec.Repos[0].Branch = "feat/new"
+	if err := state.Save(svc.Config.StatePath("branch-dirty"), st); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.checkouts = nil
+	mock.currentBranch = "feat/old"
+	mock.isClean = false
+
+	var messages []string
+	err := svc.Render(ctx, "branch-dirty", func(msg string) { messages = append(messages, msg) })
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	if len(mock.checkouts) != 0 {
+		t.Errorf("checkouts = %d, want 0 (dirty worktree should skip)", len(mock.checkouts))
+	}
+
+	found := false
+	for _, msg := range messages {
+		if strings.Contains(msg, "dirty") && strings.Contains(msg, "cannot switch") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected progress message about dirty worktree, got %v", messages)
+	}
+}
+
+func TestRenderBranchSameNoSwitch(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("Same branch", "Same branch no switch", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/x", Path: "./repo"},
+	})
+	if err := svc.Create("same-branch", st); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.branchExists = true
+	if err := svc.Render(ctx, "same-branch", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.checkouts = nil
+	mock.resets = nil
+	mock.currentBranch = "feat/x"
+	mock.isClean = true
+
+	err := svc.Render(ctx, "same-branch", noop)
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	if len(mock.checkouts) != 0 {
+		t.Errorf("checkouts = %d, want 0 (same branch, no switch needed)", len(mock.checkouts))
+	}
+	if len(mock.resets) != 1 {
+		t.Errorf("resets = %d, want 1 (normal update path)", len(mock.resets))
 	}
 }
 

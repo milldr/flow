@@ -23,6 +23,9 @@ type Runner interface {
 	EnsureRemoteRef(ctx context.Context, bareRepo, branch string) error
 	ResetBranch(ctx context.Context, worktreePath, ref string) error
 	IsClean(ctx context.Context, worktreePath string) (bool, error)
+	CurrentBranch(ctx context.Context, worktreePath string) (string, error)
+	CheckoutBranch(ctx context.Context, worktreePath, branch string) error
+	CheckoutNewBranch(ctx context.Context, worktreePath, newBranch, startPoint string) error
 	Rebase(ctx context.Context, worktreePath, onto string) error
 	RebaseAbort(ctx context.Context, worktreePath string) error
 }
@@ -172,6 +175,24 @@ func (r *RealRunner) IsClean(ctx context.Context, worktreePath string) (bool, er
 		return false, err
 	}
 	return out == "", nil
+}
+
+// CurrentBranch returns the currently checked-out branch in a worktree.
+func (r *RealRunner) CurrentBranch(ctx context.Context, worktreePath string) (string, error) {
+	r.log().Debug("getting current branch", "path", worktreePath)
+	return r.output(ctx, "-C", worktreePath, "rev-parse", "--abbrev-ref", "HEAD")
+}
+
+// CheckoutBranch switches to an existing branch in a worktree.
+func (r *RealRunner) CheckoutBranch(ctx context.Context, worktreePath, branch string) error {
+	r.log().Debug("checking out branch", "path", worktreePath, "branch", branch)
+	return r.run(ctx, "-C", worktreePath, "checkout", branch)
+}
+
+// CheckoutNewBranch creates and switches to a new branch from a start point.
+func (r *RealRunner) CheckoutNewBranch(ctx context.Context, worktreePath, newBranch, startPoint string) error {
+	r.log().Debug("checking out new branch", "path", worktreePath, "branch", newBranch, "start_point", startPoint)
+	return r.run(ctx, "-C", worktreePath, "checkout", "-b", newBranch, startPoint)
 }
 
 // Rebase rebases the current branch onto the given ref.
