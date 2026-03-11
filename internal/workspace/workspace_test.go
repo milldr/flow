@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/milldr/flow/internal/agents"
@@ -14,7 +15,9 @@ import (
 )
 
 // mockRunner records calls without executing git.
+// All slice fields are guarded by mu for concurrent access during parallel render.
 type mockRunner struct {
+	mu          sync.Mutex
 	clones      []string
 	fetches     []string
 	worktrees   []string
@@ -35,41 +38,57 @@ type mockRunner struct {
 }
 
 func (m *mockRunner) BareClone(_ context.Context, url, dest string) error {
+	m.mu.Lock()
 	m.clones = append(m.clones, url)
-	if m.cloneErr != nil {
-		return m.cloneErr
+	cloneErr := m.cloneErr
+	m.mu.Unlock()
+	if cloneErr != nil {
+		return cloneErr
 	}
 	return os.MkdirAll(dest, 0o755) // create dir so stat checks pass
 }
 
 func (m *mockRunner) Fetch(_ context.Context, repoPath string) error {
+	m.mu.Lock()
 	m.fetches = append(m.fetches, repoPath)
-	return m.fetchErr
+	fetchErr := m.fetchErr
+	m.mu.Unlock()
+	return fetchErr
 }
 
 func (m *mockRunner) AddWorktree(_ context.Context, _, worktreePath, _ string) error {
+	m.mu.Lock()
 	m.worktrees = append(m.worktrees, worktreePath)
-	if m.addWTErr != nil {
-		return m.addWTErr
+	addWTErr := m.addWTErr
+	m.mu.Unlock()
+	if addWTErr != nil {
+		return addWTErr
 	}
 	return os.MkdirAll(worktreePath, 0o755)
 }
 
 func (m *mockRunner) AddWorktreeNewBranch(_ context.Context, _, worktreePath, _, startPoint string) error {
+	m.mu.Lock()
 	m.startPoints = append(m.startPoints, startPoint)
 	m.worktrees = append(m.worktrees, worktreePath)
-	if m.addWTErr != nil {
-		return m.addWTErr
+	addWTErr := m.addWTErr
+	m.mu.Unlock()
+	if addWTErr != nil {
+		return addWTErr
 	}
 	return os.MkdirAll(worktreePath, 0o755)
 }
 
 func (m *mockRunner) RemoveWorktree(_ context.Context, _, worktreePath string) error {
+	m.mu.Lock()
 	m.removed = append(m.removed, worktreePath)
+	m.mu.Unlock()
 	return os.RemoveAll(worktreePath)
 }
 
 func (m *mockRunner) BranchExists(_ context.Context, _, _ string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	return m.branchExists, nil
 }
 
@@ -78,26 +97,38 @@ func (m *mockRunner) DefaultBranch(_ context.Context, _ string) (string, error) 
 }
 
 func (m *mockRunner) EnsureRemoteRef(_ context.Context, _, branch string) error {
+	m.mu.Lock()
 	m.remoteRefs = append(m.remoteRefs, branch)
+	m.mu.Unlock()
 	return nil
 }
 
 func (m *mockRunner) ResetBranch(_ context.Context, _, ref string) error {
+	m.mu.Lock()
 	m.resets = append(m.resets, ref)
-	return m.resetErr
+	resetErr := m.resetErr
+	m.mu.Unlock()
+	return resetErr
 }
 
 func (m *mockRunner) IsClean(_ context.Context, _ string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	return m.isClean, nil
 }
 
 func (m *mockRunner) Rebase(_ context.Context, _, onto string) error {
+	m.mu.Lock()
 	m.rebases = append(m.rebases, onto)
-	return m.rebaseErr
+	rebaseErr := m.rebaseErr
+	m.mu.Unlock()
+	return rebaseErr
 }
 
 func (m *mockRunner) RebaseAbort(_ context.Context, worktreePath string) error {
+	m.mu.Lock()
 	m.aborts = append(m.aborts, worktreePath)
+	m.mu.Unlock()
 	return nil
 }
 
