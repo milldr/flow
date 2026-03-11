@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/milldr/flow/internal/agents"
@@ -14,13 +15,16 @@ import (
 )
 
 // mockRunner records calls without executing git.
+// All slice fields are guarded by mu for concurrent access during parallel render.
 type mockRunner struct {
+	mu          sync.Mutex
 	clones      []string
 	fetches     []string
 	worktrees   []string
 	removed     []string
 	startPoints []string
 	remoteRefs  []string
+	resets      []string
 	rebases     []string
 	aborts      []string
 
@@ -30,44 +34,61 @@ type mockRunner struct {
 	branchExists bool
 	isClean      bool
 	rebaseErr    error
+	resetErr     error
 }
 
 func (m *mockRunner) BareClone(_ context.Context, url, dest string) error {
+	m.mu.Lock()
 	m.clones = append(m.clones, url)
-	if m.cloneErr != nil {
-		return m.cloneErr
+	cloneErr := m.cloneErr
+	m.mu.Unlock()
+	if cloneErr != nil {
+		return cloneErr
 	}
 	return os.MkdirAll(dest, 0o755) // create dir so stat checks pass
 }
 
 func (m *mockRunner) Fetch(_ context.Context, repoPath string) error {
+	m.mu.Lock()
 	m.fetches = append(m.fetches, repoPath)
-	return m.fetchErr
+	fetchErr := m.fetchErr
+	m.mu.Unlock()
+	return fetchErr
 }
 
 func (m *mockRunner) AddWorktree(_ context.Context, _, worktreePath, _ string) error {
+	m.mu.Lock()
 	m.worktrees = append(m.worktrees, worktreePath)
-	if m.addWTErr != nil {
-		return m.addWTErr
+	addWTErr := m.addWTErr
+	m.mu.Unlock()
+	if addWTErr != nil {
+		return addWTErr
 	}
 	return os.MkdirAll(worktreePath, 0o755)
 }
 
 func (m *mockRunner) AddWorktreeNewBranch(_ context.Context, _, worktreePath, _, startPoint string) error {
+	m.mu.Lock()
 	m.startPoints = append(m.startPoints, startPoint)
 	m.worktrees = append(m.worktrees, worktreePath)
-	if m.addWTErr != nil {
-		return m.addWTErr
+	addWTErr := m.addWTErr
+	m.mu.Unlock()
+	if addWTErr != nil {
+		return addWTErr
 	}
 	return os.MkdirAll(worktreePath, 0o755)
 }
 
 func (m *mockRunner) RemoveWorktree(_ context.Context, _, worktreePath string) error {
+	m.mu.Lock()
 	m.removed = append(m.removed, worktreePath)
+	m.mu.Unlock()
 	return os.RemoveAll(worktreePath)
 }
 
 func (m *mockRunner) BranchExists(_ context.Context, _, _ string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	return m.branchExists, nil
 }
 
@@ -76,21 +97,38 @@ func (m *mockRunner) DefaultBranch(_ context.Context, _ string) (string, error) 
 }
 
 func (m *mockRunner) EnsureRemoteRef(_ context.Context, _, branch string) error {
+	m.mu.Lock()
 	m.remoteRefs = append(m.remoteRefs, branch)
+	m.mu.Unlock()
 	return nil
 }
 
+func (m *mockRunner) ResetBranch(_ context.Context, _, ref string) error {
+	m.mu.Lock()
+	m.resets = append(m.resets, ref)
+	resetErr := m.resetErr
+	m.mu.Unlock()
+	return resetErr
+}
+
 func (m *mockRunner) IsClean(_ context.Context, _ string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	return m.isClean, nil
 }
 
 func (m *mockRunner) Rebase(_ context.Context, _, onto string) error {
+	m.mu.Lock()
 	m.rebases = append(m.rebases, onto)
-	return m.rebaseErr
+	rebaseErr := m.rebaseErr
+	m.mu.Unlock()
+	return rebaseErr
 }
 
 func (m *mockRunner) RebaseAbort(_ context.Context, worktreePath string) error {
+	m.mu.Lock()
 	m.aborts = append(m.aborts, worktreePath)
+	m.mu.Unlock()
 	return nil
 }
 
@@ -227,10 +265,13 @@ func TestRender(t *testing.T) {
 		t.Errorf("worktrees = %d, want 2", len(mock.worktrees))
 	}
 
-	// Second render should fetch, not clone
+	// Second render should fetch (not clone) and update existing worktrees
 	mock.clones = nil
 	mock.fetches = nil
 	mock.worktrees = nil
+	mock.remoteRefs = nil
+	mock.resets = nil
+	mock.isClean = true
 	err = svc.Render(ctx, "render-ws", noop)
 	if err != nil {
 		t.Fatalf("Render (2nd): %v", err)
@@ -243,6 +284,13 @@ func TestRender(t *testing.T) {
 	}
 	if len(mock.worktrees) != 0 {
 		t.Errorf("second render worktrees = %d, want 0 (already exist)", len(mock.worktrees))
+	}
+	// Existing worktrees should be updated via EnsureRemoteRef + ResetBranch
+	if len(mock.remoteRefs) != 2 {
+		t.Errorf("second render remoteRefs = %d, want 2", len(mock.remoteRefs))
+	}
+	if len(mock.resets) != 2 {
+		t.Errorf("second render resets = %d, want 2", len(mock.resets))
 	}
 }
 
@@ -375,6 +423,76 @@ func TestListMultipleWorkspaces(t *testing.T) {
 	}
 	if len(infos) != 3 {
 		t.Errorf("expected 3 infos, got %d", len(infos))
+	}
+}
+
+func TestRenderExistingWorktreeDirtySkip(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("Dirty skip test", "Dirty skip test", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "main", Path: "./repo"},
+	})
+	if err := svc.Create("dirty-ws", st); err != nil {
+		t.Fatal(err)
+	}
+
+	// First render creates worktree
+	if err := svc.Render(ctx, "dirty-ws", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	// Second render with dirty worktree should skip reset
+	mock.resets = nil
+	mock.isClean = false
+	var messages []string
+	err := svc.Render(ctx, "dirty-ws", func(msg string) { messages = append(messages, msg) })
+	if err != nil {
+		t.Fatalf("Render (dirty): %v", err)
+	}
+	if len(mock.resets) != 0 {
+		t.Errorf("resets = %d, want 0 (dirty worktree should skip)", len(mock.resets))
+	}
+	// Check progress message mentions dirty
+	found := false
+	for _, msg := range messages {
+		if strings.Contains(msg, "dirty") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected progress message mentioning dirty worktree")
+	}
+}
+
+func TestRenderParallelFetch(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("Parallel fetch", "Parallel fetch test", []state.Repo{
+		{URL: "github.com/org/repo-a", Branch: "main", Path: "./repo-a"},
+		{URL: "github.com/org/repo-b", Branch: "main", Path: "./repo-b"},
+		{URL: "github.com/org/repo-c", Branch: "main", Path: "./repo-c"},
+	})
+	if err := svc.Create("parallel-ws", st); err != nil {
+		t.Fatal(err)
+	}
+
+	err := svc.Render(ctx, "parallel-ws", noop)
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	// All repos should have been cloned and fetched
+	if len(mock.clones) != 3 {
+		t.Errorf("clones = %d, want 3", len(mock.clones))
+	}
+	if len(mock.fetches) != 3 {
+		t.Errorf("fetches = %d, want 3", len(mock.fetches))
+	}
+	if len(mock.worktrees) != 3 {
+		t.Errorf("worktrees = %d, want 3", len(mock.worktrees))
 	}
 }
 
