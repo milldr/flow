@@ -192,9 +192,35 @@ func (s *Service) Resolve(idOrName string) ([]Info, error) {
 	return matches, nil
 }
 
+// BranchConflict controls what happens when a branch already exists during render.
+type BranchConflict int
+
+const (
+	// BranchConflictPrompt asks the user interactively (default).
+	BranchConflictPrompt BranchConflict = iota
+	// BranchConflictReset deletes the existing branch and creates fresh from default.
+	BranchConflictReset
+	// BranchConflictUseExisting checks out the existing branch as-is.
+	BranchConflictUseExisting
+)
+
+// RenderOptions configures render behavior.
+type RenderOptions struct {
+	// OnBranchConflict controls what to do when a branch already exists.
+	OnBranchConflict BranchConflict
+	// PromptBranchConflict is called when OnBranchConflict is BranchConflictPrompt
+	// and a branch already exists. It should return true to reset (create fresh)
+	// or false to use the existing branch.
+	PromptBranchConflict func(repo, branch, defaultBranch string) (reset bool, err error)
+}
+
 // Render materializes a workspace: ensures bare clones and creates worktrees.
 // progress is called with status messages for each repo.
-func (s *Service) Render(ctx context.Context, id string, progress func(msg string)) error {
+func (s *Service) Render(ctx context.Context, id string, progress func(msg string), opts *RenderOptions) error {
+	if opts == nil {
+		opts = &RenderOptions{}
+	}
+
 	st, err := s.Find(id)
 	if err != nil {
 		return err
@@ -238,11 +264,31 @@ func (s *Service) Render(ctx context.Context, id string, progress func(msg strin
 			}
 
 			if exists {
-				s.log().Debug("creating worktree from existing branch", "path", worktreePath, "branch", repo.Branch)
-				if err := s.Git.AddWorktree(ctx, barePath, worktreePath, repo.Branch); err != nil {
-					return fmt.Errorf("creating worktree for %s: %w", repo.URL, err)
+				shouldReset, err := s.shouldResetBranch(ctx, opts, barePath, repoPath, repo.Branch)
+				if err != nil {
+					return err
 				}
-				progress(fmt.Sprintf("      └── %s (%s) ✓", repoPath, repo.Branch))
+
+				if shouldReset {
+					defaultBranch, err := s.Git.DefaultBranch(ctx, barePath)
+					if err != nil {
+						return fmt.Errorf("getting default branch for %s: %w", repo.URL, err)
+					}
+					s.log().Debug("resetting branch", "branch", repo.Branch, "from", defaultBranch)
+					if err := s.Git.DeleteBranch(ctx, barePath, repo.Branch); err != nil {
+						return fmt.Errorf("deleting branch %s in %s: %w", repo.Branch, repo.URL, err)
+					}
+					if err := s.Git.AddWorktreeNewBranch(ctx, barePath, worktreePath, repo.Branch, defaultBranch); err != nil {
+						return fmt.Errorf("creating worktree for %s: %w", repo.URL, err)
+					}
+					progress(fmt.Sprintf("      └── %s (%s, reset from %s) ✓", repoPath, repo.Branch, defaultBranch))
+				} else {
+					s.log().Debug("creating worktree from existing branch", "path", worktreePath, "branch", repo.Branch)
+					if err := s.Git.AddWorktree(ctx, barePath, worktreePath, repo.Branch); err != nil {
+						return fmt.Errorf("creating worktree for %s: %w", repo.URL, err)
+					}
+					progress(fmt.Sprintf("      └── %s (%s) ✓", repoPath, repo.Branch))
+				}
 			} else {
 				defaultBranch, err := s.Git.DefaultBranch(ctx, barePath)
 				if err != nil {
@@ -266,6 +312,26 @@ func (s *Service) Render(ctx context.Context, id string, progress func(msg strin
 	}
 
 	return nil
+}
+
+// shouldResetBranch determines whether to reset an existing branch based on options.
+func (s *Service) shouldResetBranch(ctx context.Context, opts *RenderOptions, barePath, repoPath, branch string) (bool, error) {
+	switch opts.OnBranchConflict {
+	case BranchConflictReset:
+		return true, nil
+	case BranchConflictUseExisting:
+		return false, nil
+	default: // BranchConflictPrompt
+		if opts.PromptBranchConflict == nil {
+			// No prompt callback — default to using existing
+			return false, nil
+		}
+		defaultBranch, err := s.Git.DefaultBranch(ctx, barePath)
+		if err != nil {
+			return false, fmt.Errorf("getting default branch: %w", err)
+		}
+		return opts.PromptBranchConflict(repoPath, branch, defaultBranch)
+	}
 }
 
 // Archive removes worktrees (freeing branches) and marks the workspace as archived.

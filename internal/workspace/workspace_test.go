@@ -64,6 +64,10 @@ func (m *mockRunner) BranchExists(_ context.Context, _, _ string) (bool, error) 
 	return m.branchExists, nil
 }
 
+func (m *mockRunner) DeleteBranch(_ context.Context, _, _ string) error {
+	return nil
+}
+
 func (m *mockRunner) DefaultBranch(_ context.Context, _ string) (string, error) {
 	return "main", nil
 }
@@ -188,7 +192,7 @@ func TestRender(t *testing.T) {
 	var messages []string
 	err := svc.Render(ctx, "render-ws", func(msg string) {
 		messages = append(messages, msg)
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -204,7 +208,7 @@ func TestRender(t *testing.T) {
 	mock.clones = nil
 	mock.fetches = nil
 	mock.worktrees = nil
-	err = svc.Render(ctx, "render-ws", noop)
+	err = svc.Render(ctx, "render-ws", noop, nil)
 	if err != nil {
 		t.Fatalf("Render (2nd): %v", err)
 	}
@@ -232,7 +236,7 @@ func TestDelete(t *testing.T) {
 	}
 
 	// Render first to create worktrees
-	if err := svc.Render(ctx, "del-ws", noop); err != nil {
+	if err := svc.Render(ctx, "del-ws", noop, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -363,7 +367,7 @@ func TestRenderCloneError(t *testing.T) {
 	}
 
 	mock.cloneErr = errors.New("auth failed")
-	err := svc.Render(ctx, "clone-fail", noop)
+	err := svc.Render(ctx, "clone-fail", noop, nil)
 	if err == nil {
 		t.Fatal("expected error from clone failure")
 	}
@@ -384,13 +388,13 @@ func TestRenderFetchError(t *testing.T) {
 	}
 
 	// First render succeeds (clones)
-	if err := svc.Render(ctx, "fetch-fail", noop); err != nil {
+	if err := svc.Render(ctx, "fetch-fail", noop, nil); err != nil {
 		t.Fatal(err)
 	}
 
 	// Second render fails on fetch
 	mock.fetchErr = errors.New("network down")
-	err := svc.Render(ctx, "fetch-fail", noop)
+	err := svc.Render(ctx, "fetch-fail", noop, nil)
 	if err == nil {
 		t.Fatal("expected error from fetch failure")
 	}
@@ -408,7 +412,7 @@ func TestRenderAddWorktreeError(t *testing.T) {
 	}
 
 	mock.addWTErr = errors.New("branch not found")
-	err := svc.Render(ctx, "wt-fail", noop)
+	err := svc.Render(ctx, "wt-fail", noop, nil)
 	if err == nil {
 		t.Fatal("expected error from AddWorktree failure")
 	}
@@ -418,7 +422,7 @@ func TestRenderNotFound(t *testing.T) {
 	svc, _ := testService(t)
 	ctx := context.Background()
 
-	err := svc.Render(ctx, "nonexistent", noop)
+	err := svc.Render(ctx, "nonexistent", noop, nil)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -474,7 +478,7 @@ func TestDeleteMultipleRepos(t *testing.T) {
 	if err := svc.Create("multi-del", st); err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.Render(ctx, "multi-del", noop); err != nil {
+	if err := svc.Render(ctx, "multi-del", noop, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -698,7 +702,7 @@ func TestRenderCreatesClaudeFiles(t *testing.T) {
 	if err := svc.Create("claude-ws", st); err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.Render(ctx, "claude-ws", noop); err != nil {
+	if err := svc.Render(ctx, "claude-ws", noop, nil); err != nil {
 		t.Fatalf("Render: %v", err)
 	}
 
