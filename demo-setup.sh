@@ -83,8 +83,9 @@ YAML
 )"
 
 # Render both workspaces so exec and status work
-$FLOW render bold-creek
-$FLOW render swift-pine
+# Use --reset=false to skip interactive prompt when branches already exist
+$FLOW render bold-creek --reset=false
+$FLOW render swift-pine --reset=false
 
 # --- Add local commits so status checks detect diffs ---
 

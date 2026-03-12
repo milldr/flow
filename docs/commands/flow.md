@@ -16,6 +16,7 @@ A YAML manifest defines which repos/branches belong together, and `flow render` 
 
 ### SEE ALSO
 
+* [flow archive](flow_archive.md)	 - Archive a workspace (remove worktrees, keep state)
 * [flow delete](flow_delete.md)	 - Delete a workspace and its worktrees
 * [flow edit](flow_edit.md)	 - Open flow configuration files in editor
 * [flow exec](flow_exec.md)	 - Run a command from the workspace directory
