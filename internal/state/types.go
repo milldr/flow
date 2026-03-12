@@ -15,6 +15,7 @@ type Metadata struct {
 	Name        string `yaml:"name,omitempty"`
 	Description string `yaml:"description,omitempty"`
 	Created     string `yaml:"created"`
+	Archived    bool   `yaml:"archived,omitempty"`
 }
 
 // Spec defines the workspace contents.

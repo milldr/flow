@@ -61,6 +61,19 @@ func SelectAgent(agents []AgentOption) (string, error) {
 	return selected, err
 }
 
+// Confirm prompts the user with a yes/no question.
+func Confirm(msg string) (bool, error) {
+	var confirm bool
+	err := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title(msg).
+				Value(&confirm),
+		),
+	).Run()
+	return confirm, err
+}
+
 // DeleteRepo holds repo display info for the delete confirmation prompt.
 type DeleteRepo struct {
 	Path   string

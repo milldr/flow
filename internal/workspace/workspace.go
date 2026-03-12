@@ -41,6 +41,8 @@ type Info struct {
 	Name        string // metadata.name (may be empty or duplicated)
 	Description string
 	RepoCount   int
+	RepoNames   []string // short repo names (derived from URLs)
+	Archived    bool
 	Created     time.Time
 }
 
@@ -109,11 +111,17 @@ func (s *Service) List() ([]Info, error) {
 		}
 
 		created, _ := time.Parse(time.RFC3339, st.Metadata.Created)
+		repoNames := make([]string, len(st.Spec.Repos))
+		for i, r := range st.Spec.Repos {
+			repoNames[i] = state.RepoPath(r)
+		}
 		infos = append(infos, Info{
 			ID:          entry.Name(),
 			Name:        st.Metadata.Name,
 			Description: st.Metadata.Description,
 			RepoCount:   len(st.Spec.Repos),
+			RepoNames:   repoNames,
+			Archived:    st.Metadata.Archived,
 			Created:     created,
 		})
 	}
@@ -147,11 +155,17 @@ func (s *Service) Resolve(idOrName string) ([]Info, error) {
 		stPath := s.Config.StatePath(idOrName)
 		st, _ := state.Load(stPath)
 		created, _ := time.Parse(time.RFC3339, st.Metadata.Created)
+		repoNames := make([]string, len(st.Spec.Repos))
+		for i, r := range st.Spec.Repos {
+			repoNames[i] = state.RepoPath(r)
+		}
 		return []Info{{
 			ID:          idOrName,
 			Name:        st.Metadata.Name,
 			Description: st.Metadata.Description,
 			RepoCount:   len(st.Spec.Repos),
+			RepoNames:   repoNames,
+			Archived:    st.Metadata.Archived,
 			Created:     created,
 		}}, nil
 	}
@@ -252,6 +266,33 @@ func (s *Service) Render(ctx context.Context, id string, progress func(msg strin
 	}
 
 	return nil
+}
+
+// Archive removes worktrees (freeing branches) and marks the workspace as archived.
+// The workspace directory and state file are preserved so it can still appear in listings.
+func (s *Service) Archive(ctx context.Context, id string) error {
+	st, err := s.Find(id)
+	if err != nil {
+		return err
+	}
+
+	wsDir := s.Config.WorkspacePath(id)
+	s.log().Debug("archiving workspace", "id", id, "path", wsDir)
+
+	// Remove worktrees to free branches
+	for _, repo := range st.Spec.Repos {
+		barePath := s.Config.BareRepoPath(repo.URL)
+		worktreePath := filepath.Join(wsDir, state.RepoPath(repo))
+
+		if _, err := os.Stat(worktreePath); err == nil {
+			s.log().Debug("removing worktree", "path", worktreePath)
+			_ = s.Git.RemoveWorktree(ctx, barePath, worktreePath)
+		}
+	}
+
+	// Mark as archived in state
+	st.Metadata.Archived = true
+	return state.Save(s.Config.StatePath(id), st)
 }
 
 // Delete removes all worktrees and the workspace directory.

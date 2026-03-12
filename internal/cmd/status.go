@@ -17,33 +17,50 @@ import (
 )
 
 func newStatusCmd(svc *workspace.Service, cfg *config.Config) *cobra.Command {
+	var showAll bool
+
 	cmd := &cobra.Command{
 		Use:   "status [workspace]",
 		Short: "Show workspace status",
 		Long: `Show the resolved status of workspaces.
 
 Without arguments, shows all workspaces with their statuses.
+Archived workspaces are hidden by default; use --all to include them.
 With a workspace argument, shows a detailed per-repo status breakdown.`,
 		Args:    cobra.MaximumNArgs(1),
-		Example: "  flow status                  # Show all workspace statuses\n  flow status vpc-ipv6          # Show per-repo breakdown",
+		Example: "  flow status                  # Show all workspace statuses\n  flow status --all             # Include archived workspaces\n  flow status vpc-ipv6          # Show per-repo breakdown",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				return runStatusAll(cmd.Context(), svc, cfg)
+				return runStatusAll(cmd.Context(), svc, cfg, showAll)
 			}
 			return runStatusWorkspace(cmd.Context(), svc, cfg, args[0])
 		},
 	}
 
+	cmd.Flags().BoolVarP(&showAll, "all", "a", false, "Include archived workspaces")
 	return cmd
 }
 
-func runStatusAll(ctx context.Context, svc *workspace.Service, cfg *config.Config) error {
-	infos, err := svc.List()
+func runStatusAll(ctx context.Context, svc *workspace.Service, cfg *config.Config, showAll bool) error {
+	allInfos, err := svc.List()
 	if err != nil {
 		return err
 	}
 
+	// Filter out archived workspaces unless --all is set.
+	var infos []workspace.Info
+	for _, info := range allInfos {
+		if !showAll && info.Archived {
+			continue
+		}
+		infos = append(infos, info)
+	}
+
 	if len(infos) == 0 {
+		if !showAll && len(allInfos) > 0 {
+			ui.Print("No active workspaces. Run " + ui.Code("flow status --all") + " to include archived.")
+			return nil
+		}
 		ui.Print("No workspaces found. Run " + ui.Code("flow init") + " to create one.")
 		return nil
 	}
@@ -56,9 +73,9 @@ func runStatusAll(ctx context.Context, svc *workspace.Service, cfg *config.Confi
 			name = info.ID
 		}
 		rows[i] = ui.StatusRow{
-			Name:    name,
-			Repos:   fmt.Sprintf("%d", info.RepoCount),
-			Created: ui.RelativeTime(info.Created),
+			Name:      name,
+			RepoNames: info.RepoNames,
+			Created:   ui.RelativeTime(info.Created),
 		}
 	}
 

@@ -4,6 +4,7 @@ package ui
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
@@ -70,6 +71,26 @@ func StatusStyle(status string) string {
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render(status)
 	default:
 		return status
+	}
+}
+
+// StatusColorRepos returns a comma-separated list of repo names colored to match the status.
+func StatusColorRepos(status string, names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+	joined := strings.Join(names, ", ")
+	switch status {
+	case "closed":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Render(joined)
+	case "in-review":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render(joined)
+	case "in-progress":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Render(joined)
+	case "open":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render(joined)
+	default:
+		return joined
 	}
 }
 

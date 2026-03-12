@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -13,9 +14,9 @@ import (
 
 // StatusRow holds the static columns for one workspace row.
 type StatusRow struct {
-	Name    string
-	Repos   string
-	Created string
+	Name      string
+	RepoNames []string // short repo names for display
+	Created   string
 }
 
 // StatusResolvedMsg signals that a row's status has been resolved.
@@ -92,16 +93,19 @@ func (m statusTableModel) renderTable(showSpinner bool) string {
 
 	for i, row := range m.rows {
 		var statusCell string
+		var reposCell string
 		if m.statuses[i] == "" {
 			if showSpinner {
 				statusCell = m.spinner.View() + " ..."
 			} else {
 				statusCell = "..."
 			}
+			reposCell = strings.Join(row.RepoNames, ", ")
 		} else {
 			statusCell = StatusStyle(m.statuses[i])
+			reposCell = StatusColorRepos(m.statuses[i], row.RepoNames)
 		}
-		rows = append(rows, []string{row.Name, statusCell, row.Repos, row.Created})
+		rows = append(rows, []string{row.Name, statusCell, reposCell, row.Created})
 	}
 
 	t := table.New().
@@ -162,7 +166,8 @@ func runStatusTablePlain(rows []StatusRow, resolve func(send func(StatusResolved
 		if s == "" {
 			s = "-"
 		}
-		tableRows = append(tableRows, []string{row.Name, s, row.Repos, row.Created})
+		reposCell := strings.Join(row.RepoNames, ", ")
+		tableRows = append(tableRows, []string{row.Name, s, reposCell, row.Created})
 	}
 
 	fmt.Println(Table(headers, tableRows))
