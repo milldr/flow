@@ -17,7 +17,7 @@ import (
 // StatusRow holds the static columns for one workspace row.
 type StatusRow struct {
 	Name         string
-	RepoNames    []string  // short repo names for display
+	RepoNames    []string // short repo names for display
 	Created      string
 	CreatedAt    time.Time // used for sorting within status groups
 	CachedStatus string    // last-known status for initial sort order

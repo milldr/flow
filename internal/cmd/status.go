@@ -239,4 +239,3 @@ func stateReposToInfo(st *state.State, wsDir string) []status.RepoInfo {
 	}
 	return repos
 }
-
