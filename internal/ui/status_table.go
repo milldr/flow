@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -16,7 +17,7 @@ import (
 // StatusRow holds the static columns for one workspace row.
 type StatusRow struct {
 	Name         string
-	Repos        string
+	RepoNames    []string  // short repo names for display
 	Created      string
 	CreatedAt    time.Time // used for sorting within status groups
 	CachedStatus string    // last-known status for initial sort order
@@ -145,7 +146,8 @@ func (m statusTableModel) renderTable(showSpinner bool, sortStatuses []string) s
 		} else {
 			statusCell = StatusStyle(m.statuses[i], m.display.Colors)
 		}
-		rows = append(rows, []string{row.Name, statusCell, row.Repos, row.Created})
+		reposCell := strings.Join(row.RepoNames, ", ")
+		rows = append(rows, []string{row.Name, statusCell, reposCell, row.Created})
 	}
 
 	t := table.New().
@@ -208,7 +210,7 @@ func runStatusTablePlain(rows []StatusRow, display StatusDisplayConfig, resolve 
 		if s == "" {
 			s = "-"
 		}
-		tableRows = append(tableRows, []string{rows[i].Name, s, rows[i].Repos, rows[i].Created})
+		tableRows = append(tableRows, []string{rows[i].Name, s, strings.Join(rows[i].RepoNames, ", "), rows[i].Created})
 	}
 
 	fmt.Println(Table(headers, tableRows))
