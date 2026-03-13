@@ -976,6 +976,71 @@ func TestRenderCreatesClaudeFiles(t *testing.T) {
 	}
 }
 
+func TestRenderExistingBranchUpdatesToRemote(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("Existing branch update", "Existing branch should fast-forward to remote", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "staging", Path: "./repo"},
+	})
+	if err := svc.Create("existing-branch", st); err != nil {
+		t.Fatal(err)
+	}
+
+	// Branch exists remotely; worktree is clean after creation
+	mock.branchExists = true
+	mock.isClean = true
+
+	var messages []string
+	err := svc.Render(ctx, "existing-branch", func(msg string) { messages = append(messages, msg) }, &RenderOptions{
+		OnBranchConflict: BranchConflictUseExisting,
+	})
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	// Should have created the worktree
+	if len(mock.worktrees) != 1 {
+		t.Fatalf("worktrees = %d, want 1", len(mock.worktrees))
+	}
+
+	// Should have called EnsureRemoteRef for the branch to update to latest
+	foundRef := false
+	for _, ref := range mock.remoteRefs {
+		if ref == "staging" {
+			foundRef = true
+			break
+		}
+	}
+	if !foundRef {
+		t.Errorf("remoteRefs = %v, want to contain 'staging'", mock.remoteRefs)
+	}
+
+	// Should have called ResetBranch to fast-forward to origin/staging
+	foundReset := false
+	for _, ref := range mock.resets {
+		if ref == "origin/staging" {
+			foundReset = true
+			break
+		}
+	}
+	if !foundReset {
+		t.Errorf("resets = %v, want to contain 'origin/staging'", mock.resets)
+	}
+
+	// Progress should show "updated"
+	found := false
+	for _, msg := range messages {
+		if strings.Contains(msg, "updated") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected progress message with 'updated', got %v", messages)
+	}
+}
+
 func TestRenderBranchSwitchExistingBranch(t *testing.T) {
 	svc, mock := testService(t)
 	ctx := context.Background()
