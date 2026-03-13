@@ -19,6 +19,7 @@ type Runner interface {
 	AddWorktreeNewBranch(ctx context.Context, bareRepo, worktreePath, newBranch, startPoint string) error
 	RemoveWorktree(ctx context.Context, bareRepo, worktreePath string) error
 	BranchExists(ctx context.Context, bareRepo, branch string) (bool, error)
+	DeleteBranch(ctx context.Context, bareRepo, branch string) error
 	DefaultBranch(ctx context.Context, bareRepo string) (string, error)
 	EnsureRemoteRef(ctx context.Context, bareRepo, branch string) error
 	ResetBranch(ctx context.Context, worktreePath, ref string) error
@@ -140,6 +141,12 @@ func (r *RealRunner) BranchExists(ctx context.Context, bareRepo, branch string) 
 		return false, err
 	}
 	return out != "", nil
+}
+
+// DeleteBranch force-deletes a branch in the bare repo.
+func (r *RealRunner) DeleteBranch(ctx context.Context, bareRepo, branch string) error {
+	r.log().Debug("deleting branch", "bare_repo", bareRepo, "branch", branch)
+	return r.run(ctx, "-C", bareRepo, "branch", "-D", branch)
 }
 
 // DefaultBranch returns the default branch name (e.g. "main" or "master") for a bare repo.

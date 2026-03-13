@@ -184,11 +184,12 @@ YAML
 )"
 
 # Render all workspaces
-$FLOW render bold-creek
-$FLOW render swift-pine
-$FLOW render calm-ridge
-$FLOW render dry-fog
-$FLOW render iron-vale
+# Use --reset=false to skip interactive prompt when branches already exist
+$FLOW render bold-creek --reset=false
+$FLOW render swift-pine --reset=false
+$FLOW render calm-ridge --reset=false
+$FLOW render dry-fog --reset=false
+$FLOW render iron-vale --reset=false
 
 # --- Set up different statuses via local changes and marker files ---
 

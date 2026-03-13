@@ -94,6 +94,10 @@ func (m *mockRunner) BranchExists(_ context.Context, _, _ string) (bool, error) 
 	return m.branchExists, nil
 }
 
+func (m *mockRunner) DeleteBranch(_ context.Context, _, _ string) error {
+	return nil
+}
+
 func (m *mockRunner) DefaultBranch(_ context.Context, _ string) (string, error) {
 	return "main", nil
 }
@@ -281,7 +285,7 @@ func TestRender(t *testing.T) {
 	var messages []string
 	err := svc.Render(ctx, "render-ws", func(msg string) {
 		messages = append(messages, msg)
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -301,7 +305,7 @@ func TestRender(t *testing.T) {
 	mock.resets = nil
 	mock.isClean = true
 	mock.currentBranch = "main"
-	err = svc.Render(ctx, "render-ws", noop)
+	err = svc.Render(ctx, "render-ws", noop, nil)
 	if err != nil {
 		t.Fatalf("Render (2nd): %v", err)
 	}
@@ -336,7 +340,7 @@ func TestDelete(t *testing.T) {
 	}
 
 	// Render first to create worktrees
-	if err := svc.Render(ctx, "del-ws", noop); err != nil {
+	if err := svc.Render(ctx, "del-ws", noop, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -467,7 +471,7 @@ func TestRenderExistingWorktreeDirtySkip(t *testing.T) {
 	}
 
 	// First render creates worktree
-	if err := svc.Render(ctx, "dirty-ws", noop); err != nil {
+	if err := svc.Render(ctx, "dirty-ws", noop, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -476,7 +480,7 @@ func TestRenderExistingWorktreeDirtySkip(t *testing.T) {
 	mock.isClean = false
 	mock.currentBranch = "main"
 	var messages []string
-	err := svc.Render(ctx, "dirty-ws", func(msg string) { messages = append(messages, msg) })
+	err := svc.Render(ctx, "dirty-ws", func(msg string) { messages = append(messages, msg) }, nil)
 	if err != nil {
 		t.Fatalf("Render (dirty): %v", err)
 	}
@@ -509,7 +513,7 @@ func TestRenderParallelFetch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := svc.Render(ctx, "parallel-ws", noop)
+	err := svc.Render(ctx, "parallel-ws", noop, nil)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -538,7 +542,7 @@ func TestRenderCloneError(t *testing.T) {
 	}
 
 	mock.cloneErr = errors.New("auth failed")
-	err := svc.Render(ctx, "clone-fail", noop)
+	err := svc.Render(ctx, "clone-fail", noop, nil)
 	if err == nil {
 		t.Fatal("expected error from clone failure")
 	}
@@ -559,13 +563,13 @@ func TestRenderFetchError(t *testing.T) {
 	}
 
 	// First render succeeds (clones)
-	if err := svc.Render(ctx, "fetch-fail", noop); err != nil {
+	if err := svc.Render(ctx, "fetch-fail", noop, nil); err != nil {
 		t.Fatal(err)
 	}
 
 	// Second render fails on fetch
 	mock.fetchErr = errors.New("network down")
-	err := svc.Render(ctx, "fetch-fail", noop)
+	err := svc.Render(ctx, "fetch-fail", noop, nil)
 	if err == nil {
 		t.Fatal("expected error from fetch failure")
 	}
@@ -583,7 +587,7 @@ func TestRenderAddWorktreeError(t *testing.T) {
 	}
 
 	mock.addWTErr = errors.New("branch not found")
-	err := svc.Render(ctx, "wt-fail", noop)
+	err := svc.Render(ctx, "wt-fail", noop, nil)
 	if err == nil {
 		t.Fatal("expected error from AddWorktree failure")
 	}
@@ -602,7 +606,7 @@ func TestRenderNewBranchUsesRemoteRef(t *testing.T) {
 
 	// branchExists=false triggers the new branch path
 	mock.branchExists = false
-	err := svc.Render(ctx, "remote-ref", noop)
+	err := svc.Render(ctx, "remote-ref", noop, nil)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -632,7 +636,7 @@ func TestRenderNewBranchUsesBaseField(t *testing.T) {
 
 	// branchExists=false triggers the new branch path
 	mock.branchExists = false
-	err := svc.Render(ctx, "base-field", noop)
+	err := svc.Render(ctx, "base-field", noop, nil)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -649,7 +653,7 @@ func TestRenderNotFound(t *testing.T) {
 	svc, _ := testService(t)
 	ctx := context.Background()
 
-	err := svc.Render(ctx, "nonexistent", noop)
+	err := svc.Render(ctx, "nonexistent", noop, nil)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -705,7 +709,7 @@ func TestDeleteMultipleRepos(t *testing.T) {
 	if err := svc.Create("multi-del", st); err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.Render(ctx, "multi-del", noop); err != nil {
+	if err := svc.Render(ctx, "multi-del", noop, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -929,7 +933,7 @@ func TestRenderCreatesClaudeFiles(t *testing.T) {
 	if err := svc.Create("claude-ws", st); err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.Render(ctx, "claude-ws", noop); err != nil {
+	if err := svc.Render(ctx, "claude-ws", noop, nil); err != nil {
 		t.Fatalf("Render: %v", err)
 	}
 
@@ -985,7 +989,7 @@ func TestRenderBranchSwitchExistingBranch(t *testing.T) {
 
 	// First render creates worktree on feat/old
 	mock.branchExists = true
-	if err := svc.Render(ctx, "branch-switch", noop); err != nil {
+	if err := svc.Render(ctx, "branch-switch", noop, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1001,7 +1005,7 @@ func TestRenderBranchSwitchExistingBranch(t *testing.T) {
 	mock.branchExists = true
 
 	var messages []string
-	err := svc.Render(ctx, "branch-switch", func(msg string) { messages = append(messages, msg) })
+	err := svc.Render(ctx, "branch-switch", func(msg string) { messages = append(messages, msg) }, nil)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -1034,7 +1038,7 @@ func TestRenderBranchSwitchNewBranch(t *testing.T) {
 	}
 
 	mock.branchExists = true
-	if err := svc.Render(ctx, "branch-new", noop); err != nil {
+	if err := svc.Render(ctx, "branch-new", noop, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1051,7 +1055,7 @@ func TestRenderBranchSwitchNewBranch(t *testing.T) {
 	mock.branchExists = false
 
 	var messages []string
-	err := svc.Render(ctx, "branch-new", func(msg string) { messages = append(messages, msg) })
+	err := svc.Render(ctx, "branch-new", func(msg string) { messages = append(messages, msg) }, nil)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -1087,7 +1091,7 @@ func TestRenderBranchSwitchDirtySkip(t *testing.T) {
 	}
 
 	mock.branchExists = true
-	if err := svc.Render(ctx, "branch-dirty", noop); err != nil {
+	if err := svc.Render(ctx, "branch-dirty", noop, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1101,7 +1105,7 @@ func TestRenderBranchSwitchDirtySkip(t *testing.T) {
 	mock.isClean = false
 
 	var messages []string
-	err := svc.Render(ctx, "branch-dirty", func(msg string) { messages = append(messages, msg) })
+	err := svc.Render(ctx, "branch-dirty", func(msg string) { messages = append(messages, msg) }, nil)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -1134,7 +1138,7 @@ func TestRenderBranchSameNoSwitch(t *testing.T) {
 	}
 
 	mock.branchExists = true
-	if err := svc.Render(ctx, "same-branch", noop); err != nil {
+	if err := svc.Render(ctx, "same-branch", noop, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1143,7 +1147,7 @@ func TestRenderBranchSameNoSwitch(t *testing.T) {
 	mock.currentBranch = "feat/x"
 	mock.isClean = true
 
-	err := svc.Render(ctx, "same-branch", noop)
+	err := svc.Render(ctx, "same-branch", noop, nil)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -1167,7 +1171,7 @@ func TestSyncCleanRebase(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Render to create worktree directory
-	if err := svc.Render(ctx, "sync-clean", noop); err != nil {
+	if err := svc.Render(ctx, "sync-clean", noop, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1199,7 +1203,7 @@ func TestSyncDirtySkip(t *testing.T) {
 	if err := svc.Create("sync-dirty", st); err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.Render(ctx, "sync-dirty", noop); err != nil {
+	if err := svc.Render(ctx, "sync-dirty", noop, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1224,7 +1228,7 @@ func TestSyncUsesBaseField(t *testing.T) {
 	if err := svc.Create("sync-base", st); err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.Render(ctx, "sync-base", noop); err != nil {
+	if err := svc.Render(ctx, "sync-base", noop, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1277,7 +1281,7 @@ func TestSyncRebaseError(t *testing.T) {
 	if err := svc.Create("sync-fail", st); err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.Render(ctx, "sync-fail", noop); err != nil {
+	if err := svc.Render(ctx, "sync-fail", noop, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1307,7 +1311,7 @@ func TestSyncMultiRepos(t *testing.T) {
 	if err := svc.Create("sync-multi", st); err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.Render(ctx, "sync-multi", noop); err != nil {
+	if err := svc.Render(ctx, "sync-multi", noop, nil); err != nil {
 		t.Fatal(err)
 	}
 

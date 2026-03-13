@@ -10,6 +10,7 @@ Show workspace status
 Show the resolved status of workspaces.
 
 Without arguments, shows all workspaces with their statuses.
+Archived workspaces are hidden by default; use --all to include them.
 With a workspace argument, shows a detailed per-repo status breakdown.
 
 ```
@@ -20,12 +21,14 @@ flow status [workspace] [flags]
 
 ```
   flow status                  # Show all workspace statuses
+  flow status --all             # Include archived workspaces
   flow status vpc-ipv6          # Show per-repo breakdown
 ```
 
 ### Options
 
 ```
+  -a, --all    Include archived workspaces
   -h, --help   help for status
 ```
 

@@ -13,12 +13,15 @@ flow render <workspace> [flags]
 
 ```
   flow render calm-delta
+  flow render calm-delta --reset        # Reset existing branches
+  flow render calm-delta --reset=false   # Use existing branches
 ```
 
 ### Options
 
 ```
-  -h, --help   help for render
+  -h, --help    help for render
+      --reset   Reset existing branches to fresh state from default branch (default true)
 ```
 
 ### Options inherited from parent commands

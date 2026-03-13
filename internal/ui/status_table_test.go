@@ -13,8 +13,8 @@ var testDisplay = StatusDisplayConfig{
 
 func TestStatusTableModel_ResolvedMsgUpdatesRow(t *testing.T) {
 	rows := []StatusRow{
-		{Name: "ws-1", Repos: "2", Created: "1d ago"},
-		{Name: "ws-2", Repos: "1", Created: "3d ago"},
+		{Name: "ws-1", RepoNames: []string{"repo-a", "repo-b"}, Created: "1d ago"},
+		{Name: "ws-2", RepoNames: []string{"repo-a"}, Created: "3d ago"},
 	}
 	m := newStatusTableModel(rows, testDisplay)
 
@@ -34,8 +34,8 @@ func TestStatusTableModel_ResolvedMsgUpdatesRow(t *testing.T) {
 
 func TestStatusTableModel_AllResolvedQuits(t *testing.T) {
 	rows := []StatusRow{
-		{Name: "ws-1", Repos: "1", Created: "1d ago"},
-		{Name: "ws-2", Repos: "2", Created: "2d ago"},
+		{Name: "ws-1", RepoNames: []string{"repo-a"}, Created: "1d ago"},
+		{Name: "ws-2", RepoNames: []string{"repo-a", "repo-b"}, Created: "2d ago"},
 	}
 	m := newStatusTableModel(rows, testDisplay)
 
@@ -62,7 +62,7 @@ func TestStatusTableModel_AllResolvedQuits(t *testing.T) {
 
 func TestStatusTableModel_CtrlCQuits(t *testing.T) {
 	rows := []StatusRow{
-		{Name: "ws-1", Repos: "1", Created: "1d ago"},
+		{Name: "ws-1", RepoNames: []string{"repo-a"}, Created: "1d ago"},
 	}
 	m := newStatusTableModel(rows, testDisplay)
 
@@ -79,7 +79,7 @@ func TestStatusTableModel_CtrlCQuits(t *testing.T) {
 
 func TestStatusTableModel_OutOfBoundsIgnored(t *testing.T) {
 	rows := []StatusRow{
-		{Name: "ws-1", Repos: "1", Created: "1d ago"},
+		{Name: "ws-1", RepoNames: []string{"repo-a"}, Created: "1d ago"},
 	}
 	m := newStatusTableModel(rows, testDisplay)
 
@@ -93,8 +93,8 @@ func TestStatusTableModel_OutOfBoundsIgnored(t *testing.T) {
 
 func TestStatusTableModel_ViewShowsSpinnerForPending(t *testing.T) {
 	rows := []StatusRow{
-		{Name: "ws-1", Repos: "1", Created: "1d ago"},
-		{Name: "ws-2", Repos: "2", Created: "2d ago"},
+		{Name: "ws-1", RepoNames: []string{"repo-a"}, Created: "1d ago"},
+		{Name: "ws-2", RepoNames: []string{"repo-a", "repo-b"}, Created: "2d ago"},
 	}
 	m := newStatusTableModel(rows, testDisplay)
 
@@ -118,7 +118,7 @@ func TestStatusTableModel_ViewShowsSpinnerForPending(t *testing.T) {
 
 func TestStatusTableModel_ViewAfterDone(t *testing.T) {
 	rows := []StatusRow{
-		{Name: "ws-1", Repos: "1", Created: "1d ago"},
+		{Name: "ws-1", RepoNames: []string{"repo-a"}, Created: "1d ago"},
 	}
 	m := newStatusTableModel(rows, testDisplay)
 
@@ -133,8 +133,8 @@ func TestStatusTableModel_ViewAfterDone(t *testing.T) {
 
 func TestRunStatusTablePlain(t *testing.T) {
 	rows := []StatusRow{
-		{Name: "ws-1", Repos: "2", Created: "1d ago"},
-		{Name: "ws-2", Repos: "1", Created: "3d ago"},
+		{Name: "ws-1", RepoNames: []string{"repo-a", "repo-b"}, Created: "1d ago"},
+		{Name: "ws-2", RepoNames: []string{"repo-a"}, Created: "3d ago"},
 	}
 
 	var called bool

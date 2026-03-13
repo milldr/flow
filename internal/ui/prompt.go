@@ -61,6 +61,40 @@ func SelectAgent(agents []AgentOption) (string, error) {
 	return selected, err
 }
 
+// ConfirmBranchReset prompts the user when a branch already exists during render.
+// Returns true to reset (create fresh from default), false to use existing.
+func ConfirmBranchReset(repo, branch, defaultBranch string) (bool, error) {
+	var choice string
+	err := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title(fmt.Sprintf("Branch %q already exists in %s", branch, repo)).
+				Options(
+					huh.NewOption(fmt.Sprintf("Reset — create fresh branch from %s", defaultBranch), "reset"),
+					huh.NewOption("Use existing branch", "existing"),
+				).
+				Value(&choice),
+		),
+	).Run()
+	if err != nil {
+		return false, err
+	}
+	return choice == "reset", nil
+}
+
+// Confirm prompts the user with a yes/no question.
+func Confirm(msg string) (bool, error) {
+	var confirm bool
+	err := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title(msg).
+				Value(&confirm),
+		),
+	).Run()
+	return confirm, err
+}
+
 // DeleteRepo holds repo display info for the delete confirmation prompt.
 type DeleteRepo struct {
 	Path   string
