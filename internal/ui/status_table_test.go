@@ -6,12 +6,17 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+var testDisplay = StatusDisplayConfig{
+	Order:  map[string]int{"open": 0, "in-progress": 1, "closed": 2},
+	Colors: map[string]string{"closed": "2", "open": "8"},
+}
+
 func TestStatusTableModel_ResolvedMsgUpdatesRow(t *testing.T) {
 	rows := []StatusRow{
-		{Name: "ws-1", RepoNames: []string{"repo-a", "repo-b"}, Created: "1d ago"},
-		{Name: "ws-2", RepoNames: []string{"repo-b"}, Created: "3d ago"},
+		{Name: "ws-1", Repos: "2", Created: "1d ago"},
+		{Name: "ws-2", Repos: "1", Created: "3d ago"},
 	}
-	m := newStatusTableModel(rows)
+	m := newStatusTableModel(rows, testDisplay)
 
 	updated, _ := m.Update(StatusResolvedMsg{Index: 0, Status: "closed"})
 	m = updated.(statusTableModel)
@@ -29,10 +34,10 @@ func TestStatusTableModel_ResolvedMsgUpdatesRow(t *testing.T) {
 
 func TestStatusTableModel_AllResolvedQuits(t *testing.T) {
 	rows := []StatusRow{
-		{Name: "ws-1", RepoNames: []string{"repo-a"}, Created: "1d ago"},
-		{Name: "ws-2", RepoNames: []string{"repo-a", "repo-b"}, Created: "2d ago"},
+		{Name: "ws-1", Repos: "1", Created: "1d ago"},
+		{Name: "ws-2", Repos: "2", Created: "2d ago"},
 	}
-	m := newStatusTableModel(rows)
+	m := newStatusTableModel(rows, testDisplay)
 
 	updated, _ := m.Update(StatusResolvedMsg{Index: 0, Status: "closed"})
 	m = updated.(statusTableModel)
@@ -57,9 +62,9 @@ func TestStatusTableModel_AllResolvedQuits(t *testing.T) {
 
 func TestStatusTableModel_CtrlCQuits(t *testing.T) {
 	rows := []StatusRow{
-		{Name: "ws-1", RepoNames: []string{"repo-a"}, Created: "1d ago"},
+		{Name: "ws-1", Repos: "1", Created: "1d ago"},
 	}
-	m := newStatusTableModel(rows)
+	m := newStatusTableModel(rows, testDisplay)
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	m = updated.(statusTableModel)
@@ -74,9 +79,9 @@ func TestStatusTableModel_CtrlCQuits(t *testing.T) {
 
 func TestStatusTableModel_OutOfBoundsIgnored(t *testing.T) {
 	rows := []StatusRow{
-		{Name: "ws-1", RepoNames: []string{"repo-a"}, Created: "1d ago"},
+		{Name: "ws-1", Repos: "1", Created: "1d ago"},
 	}
-	m := newStatusTableModel(rows)
+	m := newStatusTableModel(rows, testDisplay)
 
 	updated, _ := m.Update(StatusResolvedMsg{Index: 5, Status: "closed"})
 	m = updated.(statusTableModel)
@@ -88,10 +93,10 @@ func TestStatusTableModel_OutOfBoundsIgnored(t *testing.T) {
 
 func TestStatusTableModel_ViewShowsSpinnerForPending(t *testing.T) {
 	rows := []StatusRow{
-		{Name: "ws-1", RepoNames: []string{"repo-a"}, Created: "1d ago"},
-		{Name: "ws-2", RepoNames: []string{"repo-a", "repo-b"}, Created: "2d ago"},
+		{Name: "ws-1", Repos: "1", Created: "1d ago"},
+		{Name: "ws-2", Repos: "2", Created: "2d ago"},
 	}
-	m := newStatusTableModel(rows)
+	m := newStatusTableModel(rows, testDisplay)
 
 	// Resolve one row.
 	updated, _ := m.Update(StatusResolvedMsg{Index: 0, Status: "closed"})
@@ -113,9 +118,9 @@ func TestStatusTableModel_ViewShowsSpinnerForPending(t *testing.T) {
 
 func TestStatusTableModel_ViewAfterDone(t *testing.T) {
 	rows := []StatusRow{
-		{Name: "ws-1", RepoNames: []string{"repo-a"}, Created: "1d ago"},
+		{Name: "ws-1", Repos: "1", Created: "1d ago"},
 	}
-	m := newStatusTableModel(rows)
+	m := newStatusTableModel(rows, testDisplay)
 
 	updated, _ := m.Update(StatusResolvedMsg{Index: 0, Status: "in-progress"})
 	m = updated.(statusTableModel)
@@ -128,12 +133,12 @@ func TestStatusTableModel_ViewAfterDone(t *testing.T) {
 
 func TestRunStatusTablePlain(t *testing.T) {
 	rows := []StatusRow{
-		{Name: "ws-1", RepoNames: []string{"repo-a", "repo-b"}, Created: "1d ago"},
-		{Name: "ws-2", RepoNames: []string{"repo-b"}, Created: "3d ago"},
+		{Name: "ws-1", Repos: "2", Created: "1d ago"},
+		{Name: "ws-2", Repos: "1", Created: "3d ago"},
 	}
 
 	var called bool
-	err := runStatusTablePlain(rows, func(send func(StatusResolvedMsg)) {
+	resolved, err := runStatusTablePlain(rows, testDisplay, func(send func(StatusResolvedMsg)) {
 		called = true
 		send(StatusResolvedMsg{Index: 0, Status: "closed"})
 		send(StatusResolvedMsg{Index: 1, Status: "open"})
@@ -144,6 +149,9 @@ func TestRunStatusTablePlain(t *testing.T) {
 	}
 	if !called {
 		t.Fatal("expected resolve function to be called")
+	}
+	if resolved[0] != "closed" || resolved[1] != "open" {
+		t.Errorf("unexpected resolved statuses: %v", resolved)
 	}
 }
 

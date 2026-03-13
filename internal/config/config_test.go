@@ -28,6 +28,9 @@ func TestNewDefaultPath(t *testing.T) {
 	if cfg.AgentsDir != filepath.Join(expected, "agents") {
 		t.Errorf("AgentsDir = %q", cfg.AgentsDir)
 	}
+	if cfg.CacheDir != filepath.Join(expected, "cache") {
+		t.Errorf("CacheDir = %q", cfg.CacheDir)
+	}
 	if cfg.ConfigFile != filepath.Join(expected, "config.yaml") {
 		t.Errorf("ConfigFile = %q", cfg.ConfigFile)
 	}
@@ -100,6 +103,7 @@ func TestEnsureDirs(t *testing.T) {
 		WorkspacesDir:  filepath.Join(dir, "workspaces"),
 		ReposDir:       filepath.Join(dir, "repos"),
 		AgentsDir:      filepath.Join(dir, "agents"),
+		CacheDir:       filepath.Join(dir, "cache"),
 		ConfigFile:     filepath.Join(dir, "config.yaml"),
 		StatusSpecFile: filepath.Join(dir, "status.yaml"),
 	}
@@ -108,7 +112,7 @@ func TestEnsureDirs(t *testing.T) {
 		t.Fatalf("EnsureDirs: %v", err)
 	}
 
-	for _, d := range []string{cfg.WorkspacesDir, cfg.ReposDir, cfg.AgentsDir} {
+	for _, d := range []string{cfg.WorkspacesDir, cfg.ReposDir, cfg.AgentsDir, cfg.CacheDir} {
 		info, err := os.Stat(d)
 		if err != nil {
 			t.Errorf("directory %q not created: %v", d, err)
@@ -148,6 +152,7 @@ func TestEnsureDirsLoadsExistingConfig(t *testing.T) {
 		WorkspacesDir:  filepath.Join(dir, "workspaces"),
 		ReposDir:       filepath.Join(dir, "repos"),
 		AgentsDir:      filepath.Join(dir, "agents"),
+		CacheDir:       filepath.Join(dir, "cache"),
 		ConfigFile:     filepath.Join(dir, "config.yaml"),
 		StatusSpecFile: filepath.Join(dir, "status.yaml"),
 	}

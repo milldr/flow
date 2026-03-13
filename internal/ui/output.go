@@ -4,7 +4,6 @@ package ui
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
@@ -58,40 +57,14 @@ func Printf(format string, a ...any) {
 	fmt.Printf(format, a...)
 }
 
-// StatusStyle returns the status string with color applied based on its value.
-func StatusStyle(status string) string {
-	switch status {
-	case "closed":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Render(status)
-	case "in-review":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render(status)
-	case "in-progress":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Render(status)
-	case "open":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render(status)
-	default:
-		return status
+// StatusStyle returns the status string with color applied.
+// Colors are looked up from the provided colorMap (status name → ANSI code).
+// Falls back to uncolored text if no color is defined for the status.
+func StatusStyle(status string, colorMap map[string]string) string {
+	if code, ok := colorMap[status]; ok && code != "" {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(code)).Render(status)
 	}
-}
-
-// StatusColorRepos returns a comma-separated list of repo names colored to match the status.
-func StatusColorRepos(status string, names []string) string {
-	if len(names) == 0 {
-		return ""
-	}
-	joined := strings.Join(names, ", ")
-	switch status {
-	case "closed":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Render(joined)
-	case "in-review":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render(joined)
-	case "in-progress":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Render(joined)
-	case "open":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render(joined)
-	default:
-		return joined
-	}
+	return status
 }
 
 // Truncate shortens a string to maxLen characters, appending "..." if needed.

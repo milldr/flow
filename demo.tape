@@ -5,10 +5,10 @@ Set Shell "bash"
 Set FontFamily "Menlo"
 Set FontSize 16
 Set Width 900
-Set Height 500
+Set Height 550
 Set Padding 20
 Set Theme "Catppuccin Mocha"
-Set TypingSpeed 60ms
+Set TypingSpeed 30ms
 Set PlaybackSpeed 1
 Set LetterSpacing 0
 Set LineHeight 1.2
@@ -20,11 +20,7 @@ Type `export FLOW_HOME=/tmp/flow-demo/.flow`
 Enter
 Sleep 200ms
 
-Type `export PATH="$(pwd):$PATH"`
-Enter
-Sleep 200ms
-
-Type `export EDITOR="vim -u NONE"`
+Type `export PATH="/tmp/flow-demo/bin:$(pwd):$PATH"`
 Enter
 Sleep 200ms
 
@@ -33,81 +29,54 @@ Type `cp "$FLOW_HOME/status-local.yaml" "$FLOW_HOME/status.yaml"`
 Enter
 Sleep 200ms
 
-Type "clear"
+# Clear screen and print first section comment (hidden from recording)
+Type@0ms `clear && printf '\033[2;3m# create a workspace — agent launches automatically\033[0m\n'`
 Enter
 Sleep 500ms
 
 Show
 
-# === flow status (pre-existing workspaces) ===
+# === Create a workspace — agent launches automatically ===
+
+Sleep 500ms
+
+Type "flow init dashboard"
+Sleep 500ms
+Enter
+Sleep 3s
+
+# The fake claude is now running and showing its prompt.
+# Type the task description into the agent.
+Type "dashboard charts broke after the auth migration, check the web frontend"
+Sleep 500ms
+Enter
+Sleep 5s
+
+# Agent has finished setting up. Exit the session.
+Type "/exit"
+Sleep 500ms
+Enter
+Sleep 2s
+
+# === See all workstreams at a glance ===
+
+# Clear screen and print second section comment (hidden from recording)
+Hide
+Type@0ms `clear && printf '\033[2;3m# see all workstreams at a glance\033[0m\n'`
+Enter
+Sleep 500ms
+Show
 
 Sleep 500ms
 
 Type "flow status"
 Sleep 500ms
 Enter
-Sleep 4s
-
-# === flow exec ===
-
-Type "flow exec api-refactor -- ls"
-Sleep 500ms
-Enter
-Sleep 3s
-
-# === Clear and start creating a new workspace ===
-
-Type "clear"
-Enter
-Sleep 500ms
-
-# === flow init ===
-
-Type "flow init demo"
-Sleep 500ms
-Enter
-Sleep 3s
-
-# === flow edit state (add a repo in vim) ===
-
-Type "flow edit state demo"
-Sleep 500ms
-Enter
-Sleep 1500ms
-
-# Vim opens state.yaml. Last line is "    repos: []"
-# G=last line, $=end of line, F[=back to [, C=change to EOL (deletes [])
-Type@0ms "G$F[C"
-Sleep 500ms
-
-# Now in insert mode after "    repos: " — type the repo entry
-Enter
-Type@30ms "        - url: github.com/acme/web"
-Enter
-Type@30ms "          branch: feat/dashboard"
-Enter
-Type@30ms "          path: web"
-Sleep 3s
-
-# Exit insert mode, save and quit
-Escape
-Sleep 300ms
-Type ":wq"
-Enter
-Sleep 1500ms
-
-# === flow render ===
-
-Type "flow render demo"
-Sleep 500ms
-Enter
 Sleep 5s
 
-# === flow list ===
-
-Type "flow list"
+Type "flow status api-refactor"
 Sleep 500ms
 Enter
 Sleep 4s
 
-Sleep 6s
+Sleep 4s

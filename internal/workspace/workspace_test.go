@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/milldr/flow/internal/agents"
@@ -14,62 +15,149 @@ import (
 )
 
 // mockRunner records calls without executing git.
+// All slice fields are guarded by mu for concurrent access during parallel render.
 type mockRunner struct {
-	clones    []string
-	fetches   []string
-	worktrees []string
-	removed   []string
+	mu          sync.Mutex
+	clones      []string
+	fetches     []string
+	worktrees   []string
+	removed     []string
+	startPoints []string
+	remoteRefs  []string
+	resets      []string
+	rebases     []string
+	aborts      []string
+	checkouts   []string
 
-	cloneErr     error
-	fetchErr     error
-	addWTErr     error
-	branchExists bool
+	cloneErr      error
+	fetchErr      error
+	addWTErr      error
+	branchExists  bool
+	isClean       bool
+	rebaseErr     error
+	resetErr      error
+	currentBranch string
 }
 
 func (m *mockRunner) BareClone(_ context.Context, url, dest string) error {
+	m.mu.Lock()
 	m.clones = append(m.clones, url)
-	if m.cloneErr != nil {
-		return m.cloneErr
+	cloneErr := m.cloneErr
+	m.mu.Unlock()
+	if cloneErr != nil {
+		return cloneErr
 	}
 	return os.MkdirAll(dest, 0o755) // create dir so stat checks pass
 }
 
 func (m *mockRunner) Fetch(_ context.Context, repoPath string) error {
+	m.mu.Lock()
 	m.fetches = append(m.fetches, repoPath)
-	return m.fetchErr
+	fetchErr := m.fetchErr
+	m.mu.Unlock()
+	return fetchErr
 }
 
 func (m *mockRunner) AddWorktree(_ context.Context, _, worktreePath, _ string) error {
+	m.mu.Lock()
 	m.worktrees = append(m.worktrees, worktreePath)
-	if m.addWTErr != nil {
-		return m.addWTErr
+	addWTErr := m.addWTErr
+	m.mu.Unlock()
+	if addWTErr != nil {
+		return addWTErr
 	}
 	return os.MkdirAll(worktreePath, 0o755)
 }
 
-func (m *mockRunner) AddWorktreeNewBranch(_ context.Context, _, worktreePath, _, _ string) error {
+func (m *mockRunner) AddWorktreeNewBranch(_ context.Context, _, worktreePath, _, startPoint string) error {
+	m.mu.Lock()
+	m.startPoints = append(m.startPoints, startPoint)
 	m.worktrees = append(m.worktrees, worktreePath)
-	if m.addWTErr != nil {
-		return m.addWTErr
+	addWTErr := m.addWTErr
+	m.mu.Unlock()
+	if addWTErr != nil {
+		return addWTErr
 	}
 	return os.MkdirAll(worktreePath, 0o755)
 }
 
 func (m *mockRunner) RemoveWorktree(_ context.Context, _, worktreePath string) error {
+	m.mu.Lock()
 	m.removed = append(m.removed, worktreePath)
+	m.mu.Unlock()
 	return os.RemoveAll(worktreePath)
 }
 
 func (m *mockRunner) BranchExists(_ context.Context, _, _ string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	return m.branchExists, nil
-}
-
-func (m *mockRunner) DeleteBranch(_ context.Context, _, _ string) error {
-	return nil
 }
 
 func (m *mockRunner) DefaultBranch(_ context.Context, _ string) (string, error) {
 	return "main", nil
+}
+
+func (m *mockRunner) EnsureRemoteRef(_ context.Context, _, branch string) error {
+	m.mu.Lock()
+	m.remoteRefs = append(m.remoteRefs, branch)
+	m.mu.Unlock()
+	return nil
+}
+
+func (m *mockRunner) ResetBranch(_ context.Context, _, ref string) error {
+	m.mu.Lock()
+	m.resets = append(m.resets, ref)
+	resetErr := m.resetErr
+	m.mu.Unlock()
+	return resetErr
+}
+
+func (m *mockRunner) IsClean(_ context.Context, _ string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.isClean, nil
+}
+
+func (m *mockRunner) Rebase(_ context.Context, _, onto string) error {
+	m.mu.Lock()
+	m.rebases = append(m.rebases, onto)
+	rebaseErr := m.rebaseErr
+	m.mu.Unlock()
+	return rebaseErr
+}
+
+func (m *mockRunner) RebaseAbort(_ context.Context, worktreePath string) error {
+	m.mu.Lock()
+	m.aborts = append(m.aborts, worktreePath)
+	m.mu.Unlock()
+	return nil
+}
+
+func (m *mockRunner) CurrentBranch(_ context.Context, _ string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.currentBranch == "" {
+		return "main", nil
+	}
+	return m.currentBranch, nil
+}
+
+func (m *mockRunner) CheckoutBranch(_ context.Context, _, branch string) error {
+	m.mu.Lock()
+	m.checkouts = append(m.checkouts, branch)
+	m.currentBranch = branch
+	m.mu.Unlock()
+	return nil
+}
+
+func (m *mockRunner) CheckoutNewBranch(_ context.Context, _, newBranch, startPoint string) error {
+	m.mu.Lock()
+	m.checkouts = append(m.checkouts, newBranch)
+	m.startPoints = append(m.startPoints, startPoint)
+	m.currentBranch = newBranch
+	m.mu.Unlock()
+	return nil
 }
 
 func testService(t *testing.T) (*Service, *mockRunner) {
@@ -80,6 +168,7 @@ func testService(t *testing.T) (*Service, *mockRunner) {
 		WorkspacesDir:  filepath.Join(dir, "workspaces"),
 		ReposDir:       filepath.Join(dir, "repos"),
 		AgentsDir:      filepath.Join(dir, "agents"),
+		CacheDir:       filepath.Join(dir, "cache"),
 		ConfigFile:     filepath.Join(dir, "config.yaml"),
 		StatusSpecFile: filepath.Join(dir, "status.yaml"),
 	}
@@ -182,7 +271,7 @@ func TestRender(t *testing.T) {
 
 	st := state.NewState("Render test", "Render test", []state.Repo{
 		{URL: "github.com/org/repo-a", Branch: "main", Path: "./repo-a"},
-		{URL: "github.com/org/repo-b", Branch: "feat/x", Path: "./repo-b"},
+		{URL: "github.com/org/repo-b", Branch: "main", Path: "./repo-b"},
 	})
 
 	if err := svc.Create("render-ws", st); err != nil {
@@ -192,7 +281,7 @@ func TestRender(t *testing.T) {
 	var messages []string
 	err := svc.Render(ctx, "render-ws", func(msg string) {
 		messages = append(messages, msg)
-	}, nil)
+	})
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -204,11 +293,15 @@ func TestRender(t *testing.T) {
 		t.Errorf("worktrees = %d, want 2", len(mock.worktrees))
 	}
 
-	// Second render should fetch, not clone
+	// Second render should fetch (not clone) and update existing worktrees
 	mock.clones = nil
 	mock.fetches = nil
 	mock.worktrees = nil
-	err = svc.Render(ctx, "render-ws", noop, nil)
+	mock.remoteRefs = nil
+	mock.resets = nil
+	mock.isClean = true
+	mock.currentBranch = "main"
+	err = svc.Render(ctx, "render-ws", noop)
 	if err != nil {
 		t.Fatalf("Render (2nd): %v", err)
 	}
@@ -220,6 +313,13 @@ func TestRender(t *testing.T) {
 	}
 	if len(mock.worktrees) != 0 {
 		t.Errorf("second render worktrees = %d, want 0 (already exist)", len(mock.worktrees))
+	}
+	// Existing worktrees should be updated via EnsureRemoteRef + ResetBranch
+	if len(mock.remoteRefs) != 2 {
+		t.Errorf("second render remoteRefs = %d, want 2", len(mock.remoteRefs))
+	}
+	if len(mock.resets) != 2 {
+		t.Errorf("second render resets = %d, want 2", len(mock.resets))
 	}
 }
 
@@ -236,7 +336,7 @@ func TestDelete(t *testing.T) {
 	}
 
 	// Render first to create worktrees
-	if err := svc.Render(ctx, "del-ws", noop, nil); err != nil {
+	if err := svc.Render(ctx, "del-ws", noop); err != nil {
 		t.Fatal(err)
 	}
 
@@ -355,6 +455,77 @@ func TestListMultipleWorkspaces(t *testing.T) {
 	}
 }
 
+func TestRenderExistingWorktreeDirtySkip(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("Dirty skip test", "Dirty skip test", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "main", Path: "./repo"},
+	})
+	if err := svc.Create("dirty-ws", st); err != nil {
+		t.Fatal(err)
+	}
+
+	// First render creates worktree
+	if err := svc.Render(ctx, "dirty-ws", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	// Second render with dirty worktree should skip reset
+	mock.resets = nil
+	mock.isClean = false
+	mock.currentBranch = "main"
+	var messages []string
+	err := svc.Render(ctx, "dirty-ws", func(msg string) { messages = append(messages, msg) })
+	if err != nil {
+		t.Fatalf("Render (dirty): %v", err)
+	}
+	if len(mock.resets) != 0 {
+		t.Errorf("resets = %d, want 0 (dirty worktree should skip)", len(mock.resets))
+	}
+	// Check progress message mentions dirty
+	found := false
+	for _, msg := range messages {
+		if strings.Contains(msg, "dirty") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected progress message mentioning dirty worktree")
+	}
+}
+
+func TestRenderParallelFetch(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("Parallel fetch", "Parallel fetch test", []state.Repo{
+		{URL: "github.com/org/repo-a", Branch: "main", Path: "./repo-a"},
+		{URL: "github.com/org/repo-b", Branch: "main", Path: "./repo-b"},
+		{URL: "github.com/org/repo-c", Branch: "main", Path: "./repo-c"},
+	})
+	if err := svc.Create("parallel-ws", st); err != nil {
+		t.Fatal(err)
+	}
+
+	err := svc.Render(ctx, "parallel-ws", noop)
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	// All repos should have been cloned and fetched
+	if len(mock.clones) != 3 {
+		t.Errorf("clones = %d, want 3", len(mock.clones))
+	}
+	if len(mock.fetches) != 3 {
+		t.Errorf("fetches = %d, want 3", len(mock.fetches))
+	}
+	if len(mock.worktrees) != 3 {
+		t.Errorf("worktrees = %d, want 3", len(mock.worktrees))
+	}
+}
+
 func TestRenderCloneError(t *testing.T) {
 	svc, mock := testService(t)
 	ctx := context.Background()
@@ -367,7 +538,7 @@ func TestRenderCloneError(t *testing.T) {
 	}
 
 	mock.cloneErr = errors.New("auth failed")
-	err := svc.Render(ctx, "clone-fail", noop, nil)
+	err := svc.Render(ctx, "clone-fail", noop)
 	if err == nil {
 		t.Fatal("expected error from clone failure")
 	}
@@ -388,13 +559,13 @@ func TestRenderFetchError(t *testing.T) {
 	}
 
 	// First render succeeds (clones)
-	if err := svc.Render(ctx, "fetch-fail", noop, nil); err != nil {
+	if err := svc.Render(ctx, "fetch-fail", noop); err != nil {
 		t.Fatal(err)
 	}
 
 	// Second render fails on fetch
 	mock.fetchErr = errors.New("network down")
-	err := svc.Render(ctx, "fetch-fail", noop, nil)
+	err := svc.Render(ctx, "fetch-fail", noop)
 	if err == nil {
 		t.Fatal("expected error from fetch failure")
 	}
@@ -412,9 +583,65 @@ func TestRenderAddWorktreeError(t *testing.T) {
 	}
 
 	mock.addWTErr = errors.New("branch not found")
-	err := svc.Render(ctx, "wt-fail", noop, nil)
+	err := svc.Render(ctx, "wt-fail", noop)
 	if err == nil {
 		t.Fatal("expected error from AddWorktree failure")
+	}
+}
+
+func TestRenderNewBranchUsesRemoteRef(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("Remote ref test", "Test new branch uses origin/ prefix", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/new-feature", Path: "./repo"},
+	})
+	if err := svc.Create("remote-ref", st); err != nil {
+		t.Fatal(err)
+	}
+
+	// branchExists=false triggers the new branch path
+	mock.branchExists = false
+	err := svc.Render(ctx, "remote-ref", noop)
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	if len(mock.startPoints) != 1 {
+		t.Fatalf("startPoints = %d, want 1", len(mock.startPoints))
+	}
+	if mock.startPoints[0] != "origin/main" {
+		t.Errorf("startPoint = %q, want origin/main", mock.startPoints[0])
+	}
+	// EnsureRemoteRef should be called for the base branch during render
+	if len(mock.remoteRefs) != 1 || mock.remoteRefs[0] != "main" {
+		t.Errorf("remoteRefs = %v, want [main]", mock.remoteRefs)
+	}
+}
+
+func TestRenderNewBranchUsesBaseField(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("Base field test", "Test new branch uses configured base", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/new-feature", Base: "develop", Path: "./repo"},
+	})
+	if err := svc.Create("base-field", st); err != nil {
+		t.Fatal(err)
+	}
+
+	// branchExists=false triggers the new branch path
+	mock.branchExists = false
+	err := svc.Render(ctx, "base-field", noop)
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	if len(mock.startPoints) != 1 {
+		t.Fatalf("startPoints = %d, want 1", len(mock.startPoints))
+	}
+	if mock.startPoints[0] != "origin/develop" {
+		t.Errorf("startPoint = %q, want origin/develop", mock.startPoints[0])
 	}
 }
 
@@ -422,7 +649,7 @@ func TestRenderNotFound(t *testing.T) {
 	svc, _ := testService(t)
 	ctx := context.Background()
 
-	err := svc.Render(ctx, "nonexistent", noop, nil)
+	err := svc.Render(ctx, "nonexistent", noop)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -478,7 +705,7 @@ func TestDeleteMultipleRepos(t *testing.T) {
 	if err := svc.Create("multi-del", st); err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.Render(ctx, "multi-del", noop, nil); err != nil {
+	if err := svc.Render(ctx, "multi-del", noop); err != nil {
 		t.Fatal(err)
 	}
 
@@ -702,7 +929,7 @@ func TestRenderCreatesClaudeFiles(t *testing.T) {
 	if err := svc.Create("claude-ws", st); err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.Render(ctx, "claude-ws", noop, nil); err != nil {
+	if err := svc.Render(ctx, "claude-ws", noop); err != nil {
 		t.Fatalf("Render: %v", err)
 	}
 
@@ -742,5 +969,359 @@ func TestRenderCreatesClaudeFiles(t *testing.T) {
 	expected = filepath.Join(svc.Config.AgentsDir, "claude", "skills")
 	if target != expected {
 		t.Errorf(".claude/skills target = %q, want %q", target, expected)
+	}
+}
+
+func TestRenderBranchSwitchExistingBranch(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("Branch switch test", "Branch switch existing", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/old", Path: "./repo"},
+	})
+	if err := svc.Create("branch-switch", st); err != nil {
+		t.Fatal(err)
+	}
+
+	// First render creates worktree on feat/old
+	mock.branchExists = true
+	if err := svc.Render(ctx, "branch-switch", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	// Change the branch in state and re-render
+	st.Spec.Repos[0].Branch = "feat/new"
+	if err := state.Save(svc.Config.StatePath("branch-switch"), st); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.checkouts = nil
+	mock.currentBranch = "feat/old"
+	mock.isClean = true
+	mock.branchExists = true
+
+	var messages []string
+	err := svc.Render(ctx, "branch-switch", func(msg string) { messages = append(messages, msg) })
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	if len(mock.checkouts) != 1 || mock.checkouts[0] != "feat/new" {
+		t.Errorf("checkouts = %v, want [feat/new]", mock.checkouts)
+	}
+
+	found := false
+	for _, msg := range messages {
+		if strings.Contains(msg, "switched") && strings.Contains(msg, "feat/old") && strings.Contains(msg, "feat/new") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected progress message about branch switch, got %v", messages)
+	}
+}
+
+func TestRenderBranchSwitchNewBranch(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("Branch switch new", "Branch switch new branch", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/old", Path: "./repo"},
+	})
+	if err := svc.Create("branch-new", st); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.branchExists = true
+	if err := svc.Render(ctx, "branch-new", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	// Change to a branch that doesn't exist
+	st.Spec.Repos[0].Branch = "feat/brand-new"
+	if err := state.Save(svc.Config.StatePath("branch-new"), st); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.checkouts = nil
+	mock.startPoints = nil
+	mock.currentBranch = "feat/old"
+	mock.isClean = true
+	mock.branchExists = false
+
+	var messages []string
+	err := svc.Render(ctx, "branch-new", func(msg string) { messages = append(messages, msg) })
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	if len(mock.checkouts) != 1 || mock.checkouts[0] != "feat/brand-new" {
+		t.Errorf("checkouts = %v, want [feat/brand-new]", mock.checkouts)
+	}
+	if len(mock.startPoints) != 1 || mock.startPoints[0] != "origin/main" {
+		t.Errorf("startPoints = %v, want [origin/main]", mock.startPoints)
+	}
+
+	found := false
+	for _, msg := range messages {
+		if strings.Contains(msg, "new branch from main") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected progress message about new branch, got %v", messages)
+	}
+}
+
+func TestRenderBranchSwitchDirtySkip(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("Branch switch dirty", "Branch switch dirty skip", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/old", Path: "./repo"},
+	})
+	if err := svc.Create("branch-dirty", st); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.branchExists = true
+	if err := svc.Render(ctx, "branch-dirty", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	st.Spec.Repos[0].Branch = "feat/new"
+	if err := state.Save(svc.Config.StatePath("branch-dirty"), st); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.checkouts = nil
+	mock.currentBranch = "feat/old"
+	mock.isClean = false
+
+	var messages []string
+	err := svc.Render(ctx, "branch-dirty", func(msg string) { messages = append(messages, msg) })
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	if len(mock.checkouts) != 0 {
+		t.Errorf("checkouts = %d, want 0 (dirty worktree should skip)", len(mock.checkouts))
+	}
+
+	found := false
+	for _, msg := range messages {
+		if strings.Contains(msg, "dirty") && strings.Contains(msg, "cannot switch") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected progress message about dirty worktree, got %v", messages)
+	}
+}
+
+func TestRenderBranchSameNoSwitch(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("Same branch", "Same branch no switch", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/x", Path: "./repo"},
+	})
+	if err := svc.Create("same-branch", st); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.branchExists = true
+	if err := svc.Render(ctx, "same-branch", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.checkouts = nil
+	mock.resets = nil
+	mock.currentBranch = "feat/x"
+	mock.isClean = true
+
+	err := svc.Render(ctx, "same-branch", noop)
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	if len(mock.checkouts) != 0 {
+		t.Errorf("checkouts = %d, want 0 (same branch, no switch needed)", len(mock.checkouts))
+	}
+	if len(mock.resets) != 1 {
+		t.Errorf("resets = %d, want 1 (normal update path)", len(mock.resets))
+	}
+}
+
+func TestSyncCleanRebase(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("sync-clean", "Sync clean test", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/x", Path: "./repo"},
+	})
+	if err := svc.Create("sync-clean", st); err != nil {
+		t.Fatal(err)
+	}
+	// Render to create worktree directory
+	if err := svc.Render(ctx, "sync-clean", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.fetches = nil
+	mock.remoteRefs = nil
+	mock.isClean = true
+	if err := svc.Sync(ctx, "sync-clean", noop); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	if len(mock.fetches) != 1 {
+		t.Errorf("fetches = %d, want 1", len(mock.fetches))
+	}
+	if len(mock.remoteRefs) != 1 || mock.remoteRefs[0] != "main" {
+		t.Errorf("remoteRefs = %v, want [main]", mock.remoteRefs)
+	}
+	if len(mock.rebases) != 1 || mock.rebases[0] != "origin/main" {
+		t.Errorf("rebases = %v, want [origin/main]", mock.rebases)
+	}
+}
+
+func TestSyncDirtySkip(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("sync-dirty", "Sync dirty test", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/x", Path: "./repo"},
+	})
+	if err := svc.Create("sync-dirty", st); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Render(ctx, "sync-dirty", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.fetches = nil
+	mock.isClean = false
+	if err := svc.Sync(ctx, "sync-dirty", noop); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	if len(mock.rebases) != 0 {
+		t.Errorf("rebases = %d, want 0 (dirty worktree should skip)", len(mock.rebases))
+	}
+}
+
+func TestSyncUsesBaseField(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("sync-base", "Sync base field test", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/x", Base: "develop", Path: "./repo"},
+	})
+	if err := svc.Create("sync-base", st); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Render(ctx, "sync-base", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.fetches = nil
+	mock.remoteRefs = nil
+	mock.isClean = true
+	if err := svc.Sync(ctx, "sync-base", noop); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	if len(mock.remoteRefs) != 1 || mock.remoteRefs[0] != "develop" {
+		t.Errorf("remoteRefs = %v, want [develop]", mock.remoteRefs)
+	}
+	if len(mock.rebases) != 1 || mock.rebases[0] != "origin/develop" {
+		t.Errorf("rebases = %v, want [origin/develop]", mock.rebases)
+	}
+}
+
+func TestSyncNoWorktreeSkip(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("sync-nowt", "Sync no worktree test", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/x", Path: "./repo"},
+	})
+	if err := svc.Create("sync-nowt", st); err != nil {
+		t.Fatal(err)
+	}
+	// Don't render — worktree doesn't exist
+
+	if err := svc.Sync(ctx, "sync-nowt", noop); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	if len(mock.fetches) != 0 {
+		t.Errorf("fetches = %d, want 0 (no worktree to sync)", len(mock.fetches))
+	}
+	if len(mock.rebases) != 0 {
+		t.Errorf("rebases = %d, want 0", len(mock.rebases))
+	}
+}
+
+func TestSyncRebaseError(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("sync-fail", "Sync rebase fail test", []state.Repo{
+		{URL: "github.com/org/repo", Branch: "feat/x", Path: "./repo"},
+	})
+	if err := svc.Create("sync-fail", st); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Render(ctx, "sync-fail", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.fetches = nil
+	mock.isClean = true
+	mock.rebaseErr = errors.New("conflict")
+
+	err := svc.Sync(ctx, "sync-fail", noop)
+	if err == nil {
+		t.Fatal("expected error from rebase failure")
+	}
+
+	if len(mock.aborts) != 1 {
+		t.Errorf("aborts = %d, want 1 (should abort failed rebase)", len(mock.aborts))
+	}
+}
+
+func TestSyncMultiRepos(t *testing.T) {
+	svc, mock := testService(t)
+	ctx := context.Background()
+
+	st := state.NewState("sync-multi", "Sync multi repos", []state.Repo{
+		{URL: "github.com/org/repo-a", Branch: "feat/a", Path: "./repo-a"},
+		{URL: "github.com/org/repo-b", Branch: "feat/b", Path: "./repo-b"},
+		{URL: "github.com/org/repo-c", Branch: "feat/c", Path: "./repo-c"},
+	})
+	if err := svc.Create("sync-multi", st); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Render(ctx, "sync-multi", noop); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.fetches = nil
+	mock.isClean = true
+
+	if err := svc.Sync(ctx, "sync-multi", noop); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	if len(mock.fetches) != 3 {
+		t.Errorf("fetches = %d, want 3", len(mock.fetches))
+	}
+	if len(mock.rebases) != 3 {
+		t.Errorf("rebases = %d, want 3", len(mock.rebases))
 	}
 }

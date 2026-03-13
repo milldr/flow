@@ -95,6 +95,43 @@ func TestResolveRepoDefault(t *testing.T) {
 	}
 }
 
+func TestResolveRepoSkipped(t *testing.T) {
+	mock := &mockRunner{results: map[string]bool{
+		"skip-check":   true,
+		"check-closed": true,
+	}}
+	resolver := &Resolver{Runner: mock}
+
+	spec := testSpec()
+	spec.Spec.Skip = "skip-check"
+
+	repo := RepoInfo{URL: "github.com/org/repo", Branch: "main", Path: "./repo"}
+	status := resolver.ResolveRepo(context.Background(), spec, repo, "ws-1", "my-ws")
+
+	if status != "" {
+		t.Errorf("expected empty (skipped), got %q", status)
+	}
+}
+
+func TestResolveRepoSkipNotMatched(t *testing.T) {
+	mock := &mockRunner{results: map[string]bool{
+		"skip-check":   false,
+		"check-closed": false,
+		"check-review": true,
+	}}
+	resolver := &Resolver{Runner: mock}
+
+	spec := testSpec()
+	spec.Spec.Skip = "skip-check"
+
+	repo := RepoInfo{URL: "github.com/org/repo", Branch: "feat/x", Path: "./repo"}
+	status := resolver.ResolveRepo(context.Background(), spec, repo, "ws-1", "my-ws")
+
+	if status != "in-review" {
+		t.Errorf("expected in-review, got %q", status)
+	}
+}
+
 func TestResolveWorkspaceSingleRepo(t *testing.T) {
 	mock := &mockRunner{results: map[string]bool{
 		"check-closed":   false,
@@ -191,6 +228,114 @@ func TestRepoSlug(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("RepoSlug(%q) = %q, want %q", tt.url, got, tt.want)
 		}
+	}
+}
+
+func testSpecWithSkip() *Spec {
+	s := testSpec()
+	s.Spec.Skip = "check-skip"
+	return s
+}
+
+func TestResolveWorkspaceSkippedRepoExcluded(t *testing.T) {
+	// repo-a is in-progress (feature branch), repo-b is open (main, skipped).
+	// Without skip, workspace would be open. With skip, repo-b excluded → in-progress.
+	perRepoMock := &perRepoRunner{
+		results: map[string]map[string]bool{
+			"github.com/org/repo-a": {"check-progress": true},
+			"github.com/org/repo-b": {"check-skip": true},
+		},
+	}
+	resolver := &Resolver{Runner: perRepoMock}
+
+	repos := []RepoInfo{
+		{URL: "github.com/org/repo-a", Branch: "feat/x", Path: "./repo-a"},
+		{URL: "github.com/org/repo-b", Branch: "main", Path: "./repo-b"},
+	}
+	result := resolver.ResolveWorkspace(context.Background(), testSpecWithSkip(), repos, "ws-1", "my-ws")
+
+	if result.Status != "in-progress" {
+		t.Errorf("workspace status = %q, want in-progress (skipped repo excluded)", result.Status)
+	}
+}
+
+func TestResolveWorkspaceDefaultStatusPassive(t *testing.T) {
+	// Two feature repos: one closed, one at default (open).
+	// Default status is passive — should not drag workspace to open.
+	perRepoMock := &perRepoRunner{
+		results: map[string]map[string]bool{
+			"github.com/org/repo-a": {"check-closed": true},
+			"github.com/org/repo-b": {},
+		},
+	}
+	resolver := &Resolver{Runner: perRepoMock}
+
+	repos := []RepoInfo{
+		{URL: "github.com/org/repo-a", Branch: "feat/x", Path: "./repo-a"},
+		{URL: "github.com/org/repo-b", Branch: "feat/y", Path: "./repo-b"},
+	}
+	result := resolver.ResolveWorkspace(context.Background(), testSpec(), repos, "ws-1", "my-ws")
+
+	if result.Status != "closed" {
+		t.Errorf("workspace status = %q, want closed (default status passive)", result.Status)
+	}
+}
+
+func TestResolveWorkspaceAllSkippedFallback(t *testing.T) {
+	// All repos skipped → fall back to default status.
+	mock := &mockRunner{results: map[string]bool{
+		"check-skip": true,
+	}}
+	resolver := &Resolver{Runner: mock}
+
+	repos := []RepoInfo{
+		{URL: "github.com/org/repo-a", Branch: "main", Path: "./repo-a"},
+		{URL: "github.com/org/repo-b", Branch: "main", Path: "./repo-b"},
+	}
+	result := resolver.ResolveWorkspace(context.Background(), testSpecWithSkip(), repos, "ws-1", "my-ws")
+
+	if result.Status != "open" {
+		t.Errorf("workspace status = %q, want open (all skipped fallback)", result.Status)
+	}
+}
+
+func TestResolveWorkspaceMixedSkipAndDefault(t *testing.T) {
+	// repo-a: closed (feat), repo-b: in-review (feat), repo-c: open (main, skipped).
+	// Skip excludes repo-c, default excludes nothing extra. Least advanced = in-review.
+	perRepoMock := &perRepoRunner{
+		results: map[string]map[string]bool{
+			"github.com/org/repo-a": {"check-closed": true},
+			"github.com/org/repo-b": {"check-review": true},
+			"github.com/org/repo-c": {"check-skip": true},
+		},
+	}
+	resolver := &Resolver{Runner: perRepoMock}
+
+	repos := []RepoInfo{
+		{URL: "github.com/org/repo-a", Branch: "feat/x", Path: "./repo-a"},
+		{URL: "github.com/org/repo-b", Branch: "feat/y", Path: "./repo-b"},
+		{URL: "github.com/org/repo-c", Branch: "main", Path: "./repo-c"},
+	}
+	result := resolver.ResolveWorkspace(context.Background(), testSpecWithSkip(), repos, "ws-1", "my-ws")
+
+	if result.Status != "in-review" {
+		t.Errorf("workspace status = %q, want in-review (mixed skip and default)", result.Status)
+	}
+}
+
+func TestResolveWorkspaceAllFeatureAtDefault(t *testing.T) {
+	// All feature-branch repos at default status → default (no active signal).
+	mock := &mockRunner{results: map[string]bool{}}
+	resolver := &Resolver{Runner: mock}
+
+	repos := []RepoInfo{
+		{URL: "github.com/org/repo-a", Branch: "feat/x", Path: "./repo-a"},
+		{URL: "github.com/org/repo-b", Branch: "feat/y", Path: "./repo-b"},
+	}
+	result := resolver.ResolveWorkspace(context.Background(), testSpec(), repos, "ws-1", "my-ws")
+
+	if result.Status != "open" {
+		t.Errorf("workspace status = %q, want open (all at default)", result.Status)
 	}
 }
 

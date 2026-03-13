@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"path/filepath"
 	"sync"
+	"time"
 
+	"github.com/milldr/flow/internal/cache"
 	"github.com/milldr/flow/internal/config"
 	"github.com/milldr/flow/internal/state"
 	"github.com/milldr/flow/internal/status"
@@ -65,6 +67,10 @@ func runStatusAll(ctx context.Context, svc *workspace.Service, cfg *config.Confi
 		return nil
 	}
 
+	// Load cached statuses for initial sort ordering.
+	cachePath := cfg.StatusCacheFile()
+	statusCache := cache.LoadStatus(cachePath)
+
 	// Build rows for the live table.
 	rows := make([]ui.StatusRow, len(infos))
 	for i, info := range infos {
@@ -73,10 +79,23 @@ func runStatusAll(ctx context.Context, svc *workspace.Service, cfg *config.Confi
 			name = info.ID
 		}
 		rows[i] = ui.StatusRow{
-			Name:      name,
-			RepoNames: info.RepoNames,
-			Created:   ui.RelativeTime(info.Created),
+			Name:         name,
+			RepoNames:    info.RepoNames,
+			Created:      ui.RelativeTime(info.Created),
+			CreatedAt:    info.Created,
+			CachedStatus: statusCache[info.ID].Status,
 		}
+	}
+
+	// Load the global spec for display config (sort order + colors).
+	globalSpec, specErr := status.Load(cfg.StatusSpecFile)
+	if specErr != nil {
+		// Fall back to default spec if global spec can't be loaded.
+		globalSpec = status.DefaultSpec()
+	}
+	display := ui.StatusDisplayConfig{
+		Order:  globalSpec.DisplayOrder(),
+		Colors: globalSpec.ColorMap(),
 	}
 
 	resolver := &status.Resolver{Runner: &status.ShellRunner{}}
@@ -85,7 +104,7 @@ func runStatusAll(ctx context.Context, svc *workspace.Service, cfg *config.Confi
 	var resolveErr error
 	var errOnce sync.Once
 
-	return ui.RunStatusTable(rows, func(send func(ui.StatusResolvedMsg)) {
+	resolved, err := ui.RunStatusTable(rows, display, func(send func(ui.StatusResolvedMsg)) {
 		g, gctx := errgroup.WithContext(ctx)
 		g.SetLimit(4)
 
@@ -128,6 +147,23 @@ func runStatusAll(ctx context.Context, svc *workspace.Service, cfg *config.Confi
 			ui.Errorf("%v", resolveErr)
 		}
 	})
+
+	// Save resolved statuses to cache for next run.
+	if resolved != nil {
+		now := time.Now()
+		for i, info := range infos {
+			if resolved[i] != "" {
+				statusCache[info.ID] = cache.StatusEntry{
+					Status:     resolved[i],
+					ResolvedAt: now,
+				}
+			}
+		}
+		// Best-effort save; don't fail the command if cache write fails.
+		_ = cache.SaveStatus(cachePath, statusCache)
+	}
+
+	return err
 }
 
 func runStatusWorkspace(ctx context.Context, svc *workspace.Service, cfg *config.Config, idOrName string) error {
@@ -165,16 +201,22 @@ func runStatusWorkspace(ctx context.Context, svc *workspace.Service, cfg *config
 		ui.Printf("%s\n\n", st.Metadata.Description)
 	}
 
-	ui.Printf("Status: %s  (%s)\n", ui.StatusStyle(result.Status), ui.FormatDuration(result.Duration.Milliseconds()))
+	colorMap := spec.ColorMap()
+	ui.Printf("Status: %s  (%s)\n", ui.StatusStyle(result.Status, colorMap), ui.FormatDuration(result.Duration.Milliseconds()))
 
 	if len(result.Repos) > 0 {
-		headers := []string{"REPO", "BRANCH", "STATUS", "TIME"}
+		headers := []string{"REPO", "BRANCH", "STATUS", "UPDATED", "TIME"}
 		var rows [][]string
 		for _, r := range result.Repos {
+			updated := "-"
+			if !r.LastCommit.IsZero() {
+				updated = ui.RelativeTime(r.LastCommit)
+			}
 			rows = append(rows, []string{
 				status.RepoSlug(r.URL),
 				r.Branch,
-				ui.StatusStyle(r.Status),
+				ui.StatusStyle(r.Status, colorMap),
+				updated,
 				ui.FormatDuration(r.Duration.Milliseconds()),
 			})
 		}
@@ -197,3 +239,4 @@ func stateReposToInfo(st *state.State, wsDir string) []status.RepoInfo {
 	}
 	return repos
 }
+

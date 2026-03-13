@@ -1,5 +1,7 @@
 # PRD-003: flow prompt
 
+> **Status: Superseded.** The agent-first approach in `flow init` replaces the need for a dedicated `flow prompt` command. When `flow init` launches an agent, the agent uses its embedded skills (Task Initialization in `flow-cli`) to parse the user's task description and populate the workspace state file directly. This file is kept for historical context.
+
 **Depends on:** [002-mvp.md](./002-mvp.md)
 
 ## Summary

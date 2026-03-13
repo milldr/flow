@@ -3,6 +3,7 @@ name: Release Drafter
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -17,6 +18,14 @@ jobs:
       pull-requests: write
 
     steps:
+      # Brief delay to allow GitHub API to propagate commit/PR data.
+      # Without this, the GraphQL query for associated pull requests
+      # can return empty results when run immediately after a push.
+      - name: Wait for API propagation
+        run: sleep 10
+
       - uses: release-drafter/release-drafter@v6
+        with:
+          publish: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

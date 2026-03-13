@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/milldr/flow/internal/agents"
@@ -41,8 +42,6 @@ type Info struct {
 	Name        string // metadata.name (may be empty or duplicated)
 	Description string
 	RepoCount   int
-	RepoNames   []string // short repo names (derived from URLs)
-	Archived    bool
 	Created     time.Time
 }
 
@@ -111,17 +110,11 @@ func (s *Service) List() ([]Info, error) {
 		}
 
 		created, _ := time.Parse(time.RFC3339, st.Metadata.Created)
-		repoNames := make([]string, len(st.Spec.Repos))
-		for i, r := range st.Spec.Repos {
-			repoNames[i] = state.RepoPath(r)
-		}
 		infos = append(infos, Info{
 			ID:          entry.Name(),
 			Name:        st.Metadata.Name,
 			Description: st.Metadata.Description,
 			RepoCount:   len(st.Spec.Repos),
-			RepoNames:   repoNames,
-			Archived:    st.Metadata.Archived,
 			Created:     created,
 		})
 	}
@@ -155,17 +148,11 @@ func (s *Service) Resolve(idOrName string) ([]Info, error) {
 		stPath := s.Config.StatePath(idOrName)
 		st, _ := state.Load(stPath)
 		created, _ := time.Parse(time.RFC3339, st.Metadata.Created)
-		repoNames := make([]string, len(st.Spec.Repos))
-		for i, r := range st.Spec.Repos {
-			repoNames[i] = state.RepoPath(r)
-		}
 		return []Info{{
 			ID:          idOrName,
 			Name:        st.Metadata.Name,
 			Description: st.Metadata.Description,
 			RepoCount:   len(st.Spec.Repos),
-			RepoNames:   repoNames,
-			Archived:    st.Metadata.Archived,
 			Created:     created,
 		}}, nil
 	}
@@ -192,35 +179,20 @@ func (s *Service) Resolve(idOrName string) ([]Info, error) {
 	return matches, nil
 }
 
-// BranchConflict controls what happens when a branch already exists during render.
-type BranchConflict int
-
-const (
-	// BranchConflictPrompt asks the user interactively (default).
-	BranchConflictPrompt BranchConflict = iota
-	// BranchConflictReset deletes the existing branch and creates fresh from default.
-	BranchConflictReset
-	// BranchConflictUseExisting checks out the existing branch as-is.
-	BranchConflictUseExisting
-)
-
-// RenderOptions configures render behavior.
-type RenderOptions struct {
-	// OnBranchConflict controls what to do when a branch already exists.
-	OnBranchConflict BranchConflict
-	// PromptBranchConflict is called when OnBranchConflict is BranchConflictPrompt
-	// and a branch already exists. It should return true to reset (create fresh)
-	// or false to use the existing branch.
-	PromptBranchConflict func(repo, branch, defaultBranch string) (reset bool, err error)
+// repoRenderContext holds pre-computed paths for rendering a single repo.
+type repoRenderContext struct {
+	index        int
+	repo         state.Repo
+	repoPath     string
+	barePath     string
+	worktreePath string
 }
 
 // Render materializes a workspace: ensures bare clones and creates worktrees.
+// Bare repos are fetched in parallel to ensure we always have the latest remote
+// state before creating or updating worktrees.
 // progress is called with status messages for each repo.
-func (s *Service) Render(ctx context.Context, id string, progress func(msg string), opts *RenderOptions) error {
-	if opts == nil {
-		opts = &RenderOptions{}
-	}
-
+func (s *Service) Render(ctx context.Context, id string, progress func(msg string)) error {
 	st, err := s.Find(id)
 	if err != nil {
 		return err
@@ -233,76 +205,47 @@ func (s *Service) Render(ctx context.Context, id string, progress func(msg strin
 	wsDir := s.Config.WorkspacePath(id)
 	total := len(st.Spec.Repos)
 
+	// Build render contexts for all repos
+	repos := make([]repoRenderContext, total)
 	for i, repo := range st.Spec.Repos {
-		repoPath := state.RepoPath(repo)
-		barePath := s.Config.BareRepoPath(repo.URL)
-		worktreePath := filepath.Join(wsDir, repoPath)
-
-		progress(fmt.Sprintf("[%d/%d] %s", i+1, total, repo.URL))
-
-		// Ensure bare clone exists
-		if _, err := os.Stat(barePath); os.IsNotExist(err) {
-			s.log().Debug("bare clone not found, cloning", "url", repo.URL, "dest", barePath)
-			if err := os.MkdirAll(filepath.Dir(barePath), 0o755); err != nil {
-				return err
-			}
-			if err := s.Git.BareClone(ctx, repo.URL, barePath); err != nil {
-				return fmt.Errorf("cloning %s: %w", repo.URL, err)
-			}
-		} else {
-			s.log().Debug("bare clone exists, fetching", "url", repo.URL, "path", barePath)
-			if err := s.Git.Fetch(ctx, barePath); err != nil {
-				return fmt.Errorf("fetching %s: %w", repo.URL, err)
-			}
+		repos[i] = repoRenderContext{
+			index:        i,
+			repo:         repo,
+			repoPath:     state.RepoPath(repo),
+			barePath:     s.Config.BareRepoPath(repo.URL),
+			worktreePath: filepath.Join(wsDir, state.RepoPath(repo)),
 		}
+	}
 
-		// Create worktree if it doesn't exist
-		if _, err := os.Stat(worktreePath); os.IsNotExist(err) {
-			exists, err := s.Git.BranchExists(ctx, barePath, repo.Branch)
-			if err != nil {
-				return fmt.Errorf("checking branch for %s: %w", repo.URL, err)
-			}
+	// Phase 1: Clone and fetch all bare repos in parallel.
+	// This ensures every bare clone has the latest remote refs before we
+	// create or update any worktrees.
+	fetchErrs := make([]error, total)
+	var wg sync.WaitGroup
+	for i := range repos {
+		wg.Add(1)
+		go func(rc *repoRenderContext) {
+			defer wg.Done()
+			fetchErrs[rc.index] = s.ensureBareRepo(ctx, rc)
+		}(&repos[i])
+	}
+	wg.Wait()
 
-			if exists {
-				shouldReset, err := s.shouldResetBranch(ctx, opts, barePath, repoPath, repo.Branch)
-				if err != nil {
-					return err
-				}
+	// Check for fetch errors — fail fast on any clone/fetch failure
+	for i, err := range fetchErrs {
+		if err != nil {
+			return fmt.Errorf("%s: %w", repos[i].repo.URL, err)
+		}
+	}
 
-				if shouldReset {
-					defaultBranch, err := s.Git.DefaultBranch(ctx, barePath)
-					if err != nil {
-						return fmt.Errorf("getting default branch for %s: %w", repo.URL, err)
-					}
-					s.log().Debug("resetting branch", "branch", repo.Branch, "from", defaultBranch)
-					if err := s.Git.DeleteBranch(ctx, barePath, repo.Branch); err != nil {
-						return fmt.Errorf("deleting branch %s in %s: %w", repo.Branch, repo.URL, err)
-					}
-					if err := s.Git.AddWorktreeNewBranch(ctx, barePath, worktreePath, repo.Branch, defaultBranch); err != nil {
-						return fmt.Errorf("creating worktree for %s: %w", repo.URL, err)
-					}
-					progress(fmt.Sprintf("      └── %s (%s, reset from %s) ✓", repoPath, repo.Branch, defaultBranch))
-				} else {
-					s.log().Debug("creating worktree from existing branch", "path", worktreePath, "branch", repo.Branch)
-					if err := s.Git.AddWorktree(ctx, barePath, worktreePath, repo.Branch); err != nil {
-						return fmt.Errorf("creating worktree for %s: %w", repo.URL, err)
-					}
-					progress(fmt.Sprintf("      └── %s (%s) ✓", repoPath, repo.Branch))
-				}
-			} else {
-				defaultBranch, err := s.Git.DefaultBranch(ctx, barePath)
-				if err != nil {
-					return fmt.Errorf("getting default branch for %s: %w", repo.URL, err)
-				}
-				s.log().Debug("creating worktree with new branch", "path", worktreePath, "branch", repo.Branch, "from", defaultBranch)
-				if err := s.Git.AddWorktreeNewBranch(ctx, barePath, worktreePath, repo.Branch, defaultBranch); err != nil {
-					return fmt.Errorf("creating worktree for %s: %w", repo.URL, err)
-				}
-				progress(fmt.Sprintf("      └── %s (%s, new branch from %s) ✓", repoPath, repo.Branch, defaultBranch))
-			}
-		} else {
-			s.log().Debug("worktree already exists, skipping", "path", worktreePath)
-			progress(fmt.Sprintf("      └── %s (%s) exists", repoPath, repo.Branch))
+	// Phase 2: Create or update worktrees (sequential — progress messages
+	// are order-dependent and worktree operations are fast).
+	for i := range repos {
+		rc := &repos[i]
+		progress(fmt.Sprintf("[%d/%d] %s", rc.index+1, total, rc.repo.URL))
+
+		if err := s.ensureWorktree(ctx, rc, progress); err != nil {
+			return err
 		}
 	}
 
@@ -314,51 +257,247 @@ func (s *Service) Render(ctx context.Context, id string, progress func(msg strin
 	return nil
 }
 
-// shouldResetBranch determines whether to reset an existing branch based on options.
-func (s *Service) shouldResetBranch(ctx context.Context, opts *RenderOptions, barePath, repoPath, branch string) (bool, error) {
-	switch opts.OnBranchConflict {
-	case BranchConflictReset:
-		return true, nil
-	case BranchConflictUseExisting:
-		return false, nil
-	default: // BranchConflictPrompt
-		if opts.PromptBranchConflict == nil {
-			// No prompt callback — default to using existing
-			return false, nil
+// ensureBareRepo clones (if needed) and fetches a bare repository.
+func (s *Service) ensureBareRepo(ctx context.Context, rc *repoRenderContext) error {
+	if _, err := os.Stat(rc.barePath); os.IsNotExist(err) {
+		s.log().Debug("bare clone not found, cloning", "url", rc.repo.URL, "dest", rc.barePath)
+		if err := os.MkdirAll(filepath.Dir(rc.barePath), 0o755); err != nil {
+			return err
 		}
-		defaultBranch, err := s.Git.DefaultBranch(ctx, barePath)
-		if err != nil {
-			return false, fmt.Errorf("getting default branch: %w", err)
+		if err := s.Git.BareClone(ctx, rc.repo.URL, rc.barePath); err != nil {
+			return fmt.Errorf("cloning: %w", err)
 		}
-		return opts.PromptBranchConflict(repoPath, branch, defaultBranch)
 	}
+
+	s.log().Debug("fetching bare repo", "url", rc.repo.URL, "path", rc.barePath)
+	if err := s.Git.Fetch(ctx, rc.barePath); err != nil {
+		return fmt.Errorf("fetching: %w", err)
+	}
+	return nil
 }
 
-// Archive removes worktrees (freeing branches) and marks the workspace as archived.
-// The workspace directory and state file are preserved so it can still appear in listings.
-func (s *Service) Archive(ctx context.Context, id string) error {
+// ensureWorktree creates a new worktree or updates an existing one to the
+// latest remote state.
+func (s *Service) ensureWorktree(ctx context.Context, rc *repoRenderContext, progress func(msg string)) error {
+	if _, err := os.Stat(rc.worktreePath); os.IsNotExist(err) {
+		return s.createWorktree(ctx, rc, progress)
+	}
+	return s.updateWorktree(ctx, rc, progress)
+}
+
+// createWorktree creates a new worktree, either from an existing branch or
+// by creating a new branch from the base.
+func (s *Service) createWorktree(ctx context.Context, rc *repoRenderContext, progress func(msg string)) error {
+	exists, err := s.Git.BranchExists(ctx, rc.barePath, rc.repo.Branch)
+	if err != nil {
+		return fmt.Errorf("checking branch for %s: %w", rc.repo.URL, err)
+	}
+
+	if exists {
+		s.log().Debug("creating worktree from existing branch", "path", rc.worktreePath, "branch", rc.repo.Branch)
+		if err := s.Git.AddWorktree(ctx, rc.barePath, rc.worktreePath, rc.repo.Branch); err != nil {
+			return fmt.Errorf("creating worktree for %s: %w", rc.repo.URL, err)
+		}
+		progress(fmt.Sprintf("      └── %s (%s) ✓", rc.repoPath, rc.repo.Branch))
+		return nil
+	}
+
+	baseBranch, err := s.resolveBaseBranch(ctx, rc)
+	if err != nil {
+		return err
+	}
+
+	if err := s.Git.EnsureRemoteRef(ctx, rc.barePath, baseBranch); err != nil {
+		return fmt.Errorf("ensuring remote ref for %s: %w", rc.repo.URL, err)
+	}
+
+	startPoint := "origin/" + baseBranch
+	s.log().Debug("creating worktree with new branch", "path", rc.worktreePath, "branch", rc.repo.Branch, "from", startPoint)
+	if err := s.Git.AddWorktreeNewBranch(ctx, rc.barePath, rc.worktreePath, rc.repo.Branch, startPoint); err != nil {
+		return fmt.Errorf("creating worktree for %s: %w", rc.repo.URL, err)
+	}
+	progress(fmt.Sprintf("      └── %s (%s, new branch from %s) ✓", rc.repoPath, rc.repo.Branch, baseBranch))
+	return nil
+}
+
+// updateWorktree checks for branch drift and either switches branches or
+// updates the existing worktree to the latest remote ref.
+func (s *Service) updateWorktree(ctx context.Context, rc *repoRenderContext, progress func(msg string)) error {
+	currentBranch, err := s.Git.CurrentBranch(ctx, rc.worktreePath)
+	if err != nil {
+		return fmt.Errorf("getting current branch for %s: %w", rc.repo.URL, err)
+	}
+
+	if currentBranch != rc.repo.Branch {
+		return s.switchWorktreeBranch(ctx, rc, currentBranch, progress)
+	}
+
+	return s.updateWorktreeRemote(ctx, rc, progress)
+}
+
+// switchWorktreeBranch handles the case where state.yaml specifies a different
+// branch than what's currently checked out in the worktree.
+func (s *Service) switchWorktreeBranch(ctx context.Context, rc *repoRenderContext, currentBranch string, progress func(msg string)) error {
+	clean, err := s.Git.IsClean(ctx, rc.worktreePath)
+	if err != nil {
+		return fmt.Errorf("checking worktree status for %s: %w", rc.repo.URL, err)
+	}
+	if !clean {
+		s.log().Debug("worktree is dirty, cannot switch branch", "path", rc.worktreePath, "from", currentBranch, "to", rc.repo.Branch)
+		progress(fmt.Sprintf("      └── %s (%s → %s) dirty, cannot switch branch", rc.repoPath, currentBranch, rc.repo.Branch))
+		return nil
+	}
+
+	exists, err := s.Git.BranchExists(ctx, rc.barePath, rc.repo.Branch)
+	if err != nil {
+		return fmt.Errorf("checking branch for %s: %w", rc.repo.URL, err)
+	}
+
+	if exists {
+		if err := s.Git.CheckoutBranch(ctx, rc.worktreePath, rc.repo.Branch); err != nil {
+			return fmt.Errorf("switching branch for %s: %w", rc.repo.URL, err)
+		}
+		progress(fmt.Sprintf("      └── %s (%s → %s) switched ✓", rc.repoPath, currentBranch, rc.repo.Branch))
+	} else {
+		baseBranch, err := s.resolveBaseBranch(ctx, rc)
+		if err != nil {
+			return err
+		}
+		if err := s.Git.EnsureRemoteRef(ctx, rc.barePath, baseBranch); err != nil {
+			return fmt.Errorf("ensuring remote ref for %s: %w", rc.repo.URL, err)
+		}
+		startPoint := "origin/" + baseBranch
+		if err := s.Git.CheckoutNewBranch(ctx, rc.worktreePath, rc.repo.Branch, startPoint); err != nil {
+			return fmt.Errorf("creating branch for %s: %w", rc.repo.URL, err)
+		}
+		progress(fmt.Sprintf("      └── %s (%s → %s, new branch from %s) switched ✓", rc.repoPath, currentBranch, rc.repo.Branch, baseBranch))
+	}
+
+	return s.updateWorktreeRemote(ctx, rc, progress)
+}
+
+// updateWorktreeRemote updates an existing worktree to the latest remote ref.
+func (s *Service) updateWorktreeRemote(ctx context.Context, rc *repoRenderContext, progress func(msg string)) error {
+	if err := s.Git.EnsureRemoteRef(ctx, rc.barePath, rc.repo.Branch); err != nil {
+		s.log().Debug("worktree exists, no remote branch to update from", "path", rc.worktreePath, "branch", rc.repo.Branch)
+		progress(fmt.Sprintf("      └── %s (%s) exists", rc.repoPath, rc.repo.Branch))
+		return nil
+	}
+
+	clean, err := s.Git.IsClean(ctx, rc.worktreePath)
+	if err != nil {
+		return fmt.Errorf("checking worktree status for %s: %w", rc.repo.URL, err)
+	}
+
+	if !clean {
+		s.log().Debug("worktree is dirty, skipping update", "path", rc.worktreePath)
+		progress(fmt.Sprintf("      └── %s (%s) exists (dirty, skipped update)", rc.repoPath, rc.repo.Branch))
+		return nil
+	}
+
+	ref := "origin/" + rc.repo.Branch
+	s.log().Debug("updating worktree to latest remote", "path", rc.worktreePath, "ref", ref)
+	if err := s.Git.ResetBranch(ctx, rc.worktreePath, ref); err != nil {
+		return fmt.Errorf("updating worktree for %s: %w", rc.repo.URL, err)
+	}
+
+	progress(fmt.Sprintf("      └── %s (%s) updated ✓", rc.repoPath, rc.repo.Branch))
+	return nil
+}
+
+// resolveBaseBranch returns the base branch for creating new feature branches.
+func (s *Service) resolveBaseBranch(ctx context.Context, rc *repoRenderContext) (string, error) {
+	if rc.repo.Base != "" {
+		return rc.repo.Base, nil
+	}
+	baseBranch, err := s.Git.DefaultBranch(ctx, rc.barePath)
+	if err != nil {
+		return "", fmt.Errorf("getting default branch for %s: %w", rc.repo.URL, err)
+	}
+	return baseBranch, nil
+}
+
+// Sync fetches and rebases worktrees onto their base branches.
+// It continues through failures — one repo failing doesn't block others.
+func (s *Service) Sync(ctx context.Context, id string, progress func(msg string)) error {
 	st, err := s.Find(id)
 	if err != nil {
 		return err
 	}
 
-	wsDir := s.Config.WorkspacePath(id)
-	s.log().Debug("archiving workspace", "id", id, "path", wsDir)
-
-	// Remove worktrees to free branches
-	for _, repo := range st.Spec.Repos {
-		barePath := s.Config.BareRepoPath(repo.URL)
-		worktreePath := filepath.Join(wsDir, state.RepoPath(repo))
-
-		if _, err := os.Stat(worktreePath); err == nil {
-			s.log().Debug("removing worktree", "path", worktreePath)
-			_ = s.Git.RemoveWorktree(ctx, barePath, worktreePath)
-		}
+	if err := state.Validate(st); err != nil {
+		return fmt.Errorf("invalid state: %w", err)
 	}
 
-	// Mark as archived in state
-	st.Metadata.Archived = true
-	return state.Save(s.Config.StatePath(id), st)
+	wsDir := s.Config.WorkspacePath(id)
+	total := len(st.Spec.Repos)
+	var errs []error
+
+	for i, repo := range st.Spec.Repos {
+		repoPath := state.RepoPath(repo)
+		barePath := s.Config.BareRepoPath(repo.URL)
+		worktreePath := filepath.Join(wsDir, repoPath)
+
+		progress(fmt.Sprintf("[%d/%d] %s", i+1, total, repo.URL))
+
+		// Skip if worktree doesn't exist
+		if _, err := os.Stat(worktreePath); os.IsNotExist(err) {
+			progress(fmt.Sprintf("      └── %s skipped (not rendered)", repoPath))
+			continue
+		}
+
+		// Fetch bare repo
+		if err := s.Git.Fetch(ctx, barePath); err != nil {
+			errs = append(errs, fmt.Errorf("%s: fetch: %w", repoPath, err))
+			progress(fmt.Sprintf("      └── %s fetch failed", repoPath))
+			continue
+		}
+
+		// Resolve base branch
+		var baseBranch string
+		if repo.Base != "" {
+			baseBranch = repo.Base
+		} else {
+			baseBranch, err = s.Git.DefaultBranch(ctx, barePath)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("%s: default branch: %w", repoPath, err))
+				progress(fmt.Sprintf("      └── %s failed to resolve base branch", repoPath))
+				continue
+			}
+		}
+
+		// Ensure remote ref so origin/{base} resolves from worktrees
+		if err := s.Git.EnsureRemoteRef(ctx, barePath, baseBranch); err != nil {
+			errs = append(errs, fmt.Errorf("%s: ensure remote ref: %w", repoPath, err))
+			progress(fmt.Sprintf("      └── %s failed to ensure remote ref", repoPath))
+			continue
+		}
+
+		// Check clean
+		clean, err := s.Git.IsClean(ctx, worktreePath)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("%s: checking clean: %w", repoPath, err))
+			progress(fmt.Sprintf("      └── %s failed to check status", repoPath))
+			continue
+		}
+		if !clean {
+			progress(fmt.Sprintf("      └── %s skipped (dirty worktree)", repoPath))
+			continue
+		}
+
+		// Rebase onto origin/{base}
+		onto := "origin/" + baseBranch
+		if err := s.Git.Rebase(ctx, worktreePath, onto); err != nil {
+			_ = s.Git.RebaseAbort(ctx, worktreePath)
+			errs = append(errs, fmt.Errorf("%s: rebase onto %s: %w", repoPath, onto, err))
+			progress(fmt.Sprintf("      └── %s rebase failed (aborted)", repoPath))
+			continue
+		}
+
+		progress(fmt.Sprintf("      └── %s rebased onto %s ✓", repoPath, onto))
+	}
+
+	return errors.Join(errs...)
 }
 
 // Delete removes all worktrees and the workspace directory.

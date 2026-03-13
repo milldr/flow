@@ -26,8 +26,8 @@ func TestLoadAndSave(t *testing.T) {
 	if loaded.Kind != "Status" {
 		t.Errorf("Kind = %q, want Status", loaded.Kind)
 	}
-	if len(loaded.Spec.Statuses) != 4 {
-		t.Errorf("Statuses count = %d, want 4", len(loaded.Spec.Statuses))
+	if len(loaded.Spec.Statuses) != 5 {
+		t.Errorf("Statuses count = %d, want 5", len(loaded.Spec.Statuses))
 	}
 }
 
@@ -201,6 +201,34 @@ func TestDefaultSpec(t *testing.T) {
 	spec := DefaultSpec()
 	if err := Validate(spec); err != nil {
 		t.Fatalf("DefaultSpec should be valid: %v", err)
+	}
+}
+
+func TestLoadWithSkipField(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "status.yaml")
+
+	spec := &Spec{
+		APIVersion: "flow/v1",
+		Kind:       "Status",
+		Spec: SpecBody{
+			Skip: `[ "$FLOW_REPO_BRANCH" = "main" ]`,
+			Statuses: []Entry{
+				{Name: "active", Check: "true"},
+				{Name: "open", Default: true},
+			},
+		},
+	}
+	if err := Save(path, spec); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if loaded.Spec.Skip != `[ "$FLOW_REPO_BRANCH" = "main" ]` {
+		t.Errorf("Skip = %q, want skip check command", loaded.Spec.Skip)
 	}
 }
 
