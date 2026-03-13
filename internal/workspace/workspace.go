@@ -363,8 +363,10 @@ func (s *Service) createWorktree(ctx context.Context, rc *repoRenderContext, opt
 		if err := s.Git.AddWorktree(ctx, rc.barePath, rc.worktreePath, rc.repo.Branch); err != nil {
 			return fmt.Errorf("creating worktree for %s: %w", rc.repo.URL, err)
 		}
-		progress(fmt.Sprintf("      └── %s (%s) ✓", rc.repoPath, rc.repo.Branch))
-		return nil
+		// Fast-forward to latest remote state — the local branch ref may be
+		// stale if another worktree has this branch checked out (git skips
+		// updating checked-out branches during fetch).
+		return s.updateWorktreeRemote(ctx, rc, progress)
 	}
 
 	baseBranch, err := s.resolveBaseBranch(ctx, rc)
