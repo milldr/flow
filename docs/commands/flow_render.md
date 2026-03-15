@@ -13,8 +13,7 @@ flow render <workspace> [flags]
 
 ```
   flow render calm-delta
-  flow render calm-delta --reset        # Reset existing branches
-  flow render calm-delta --reset=false   # Use existing branches
+  flow render calm-delta --reset=false   # Use existing remote branches instead of creating fresh
 ```
 
 ### Options

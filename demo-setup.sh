@@ -184,7 +184,7 @@ YAML
 )"
 
 # Render all workspaces
-# Use --reset=false to skip interactive prompt when branches already exist
+# Use --reset=false to use existing branches as-is instead of creating fresh from base
 $FLOW render bold-creek --reset=false
 $FLOW render swift-pine --reset=false
 $FLOW render calm-ridge --reset=false

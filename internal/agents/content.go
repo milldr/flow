@@ -6,8 +6,5 @@ import _ "embed"
 //go:embed defaults/claude/CLAUDE.md
 var defaultClaudeMD []byte
 
-//go:embed defaults/claude/skills/flow-cli/SKILL.md
-var defaultFlowCLI []byte
-
-//go:embed defaults/claude/skills/workspace-structure/SKILL.md
-var defaultWorkspaceStructure []byte
+//go:embed defaults/claude/skills/flow/SKILL.md
+var defaultFlowSkill []byte
