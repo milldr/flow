@@ -4,19 +4,7 @@
 
 CLI for managing multi-repo development workspaces using git worktrees.
 
-Working across multiple repos means repetitive setup, scattered branches, and cleanup debt. Flow uses a YAML state file to define which repos and branches belong together, then materializes the workspace with bare clone caching and git worktrees.
-
-### Describe the problem, flow does the rest
-
-`flow init` creates a workspace pre-configured with agent instructions and skills, then launches you directly into your preferred agent — Claude, Cursor, or anything else you configure. The agent reads the embedded flow skill to understand how workspaces work, plus any custom skills you've added (like resolving repos by friendly names). Describe what you're working on and the agent handles the rest: editing the state file, rendering worktrees, and getting everything ready to go.
-
-![flow init](demo.gif)
-
-### Track all your workstreams in one place
-
-`flow status` gives you a live view across all active workspaces. Statuses are fully customizable — they're just one-line shell commands in a config file, not hardcoded logic. Have your AI generate complex status checks (query GitHub PRs, check CI, inspect git state) and hide them behind simple labels. Nothing in flow is opinionated; anything that could be is configurable.
-
-![flow status](demo-status.gif)
+Working across multiple repos means repetitive setup, scattered branches, and cleanup debt. `flow` uses a YAML state file to define which repos and branches belong together, then materializes the workspace with bare clone caching and git worktrees.
 
 ## Features
 
@@ -26,13 +14,25 @@ Working across multiple repos means repetitive setup, scattered branches, and cl
 
 🤖 **AI agent integration** — Generate shared context files and agent instructions across repos so your AI tools have the right skills and knowledge from the start.
 
-## Why flow?
+## Why `flow`?
 
 AI agents work best when they have deterministic tools instead of freeform instructions. Asking an agent to "set up a multi-repo workspace" produces inconsistent results — but giving it a CLI that manages YAML state files, bare clone caches, and git worktrees produces the same result every time.
 
-Flow is that deterministic layer. It gives agents (and humans) a small set of reliable commands for workspace lifecycle: create, define repos in YAML, render worktrees, check status. Agents call these tools through embedded skills rather than interpreting setup instructions on their own.
+`flow` is that deterministic layer. It gives agents (and humans) a small set of reliable commands for workspace lifecycle: create, define repos in YAML, render worktrees, check status. Agents call these tools through embedded skills rather than interpreting setup instructions on their own.
 
-Beyond workspace creation, flow centralizes agent skills across all your workspaces and lets you check the status of many workstreams in parallel. It is not opinionated about which agent or editor you use — configure Claude, Cursor, or anything else in a single config file. Everything is customizable: status checks, agent skills, workspace structure.
+Beyond workspace creation, `flow` centralizes agent skills across all your workspaces and lets you check the status of many workstreams in parallel. It is not opinionated about which agent or editor you use — configure Claude, Cursor, or anything else in a single config file. Everything is customizable: status checks, agent skills, workspace structure.
+
+### Describe the problem, `flow` does the rest
+
+`flow init` creates a workspace pre-configured with agent instructions and skills, then launches you directly into your preferred agent — Claude, Cursor, or anything else you configure. The agent reads the embedded flow skill to understand how workspaces work, plus any custom skills you've added (like resolving repos by friendly names). Describe what you're working on and the agent handles the rest: editing the state file, rendering worktrees, and getting everything ready to go.
+
+![flow init](demo.gif)
+
+### Track all your workstreams in one place
+
+`flow status` gives you a live view across all active workspaces. Statuses are fully customizable — they're just one-line shell commands in a config file, not hardcoded logic. Have your AI generate complex status checks (query GitHub PRs, check CI, inspect git state) and hide them behind simple labels. Nothing in `flow` is opinionated; anything that could be is configurable.
+
+![flow status](demo-status.gif)
 
 ## Getting started
 
@@ -61,30 +61,19 @@ make install
 
 ### Create a workspace and start working
 
-Flow creates a workspace and launches your configured agent. Describe what you're working on and the agent handles the rest.
+`flow` creates a workspace and launches your configured agent. Describe what you're working on and the agent handles the rest.
 
 ```bash
-flow init my-project
+flow init
 ```
 
 The agent reads its embedded skills to edit `state.yaml`, run `flow render`, and begin working in the repos.
-
-### Manual workflow
-
-Use `--no-exec` to skip the agent launch and set things up yourself:
-
-```bash
-flow init my-project --no-exec
-flow edit state my-project    # add repos and branches
-flow render my-project        # clone repos, create worktrees
-flow exec my-project          # launch agent manually
-```
 
 See the [spec reference](docs/specs/) for YAML file schemas and the [command reference](docs/commands/) for all commands.
 
 ## How it works
 
-Flow stores everything under `~/.flow` (override with `$FLOW_HOME`):
+`flow` stores everything under `~/.flow` (override with `$FLOW_HOME`):
 
 ```
 ~/.flow/
@@ -114,7 +103,7 @@ Flow stores everything under `~/.flow` (override with `$FLOW_HOME`):
 
 Bare clones are shared across workspaces. Worktrees are cheap — they share the object store with the bare clone, so multiple workspaces pointing at the same repo don't duplicate data.
 
-Flow ships a built-in `flow` skill and consolidates skills from all repos into each workspace's `.claude/skills/` directory on render. Add your own skills to the shared directory or to individual repos. Run `flow reset skills` to update the built-in skill without touching your own.
+`flow` ships a built-in `flow` skill and consolidates skills from all repos into each workspace's `.claude/skills/` directory on render. Add your own skills to the shared directory or to individual repos. Run `flow reset skills` to update the built-in skill without touching your own.
 
 See the [spec reference](docs/specs/) for YAML file schemas and the [command reference](docs/commands/) for usage, flags, and GIF demos.
 
