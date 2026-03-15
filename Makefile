@@ -27,6 +27,7 @@ snapshot:
 demo: build
 	bash demo-setup.sh
 	vhs demo.tape
+	vhs demo-status.tape
 
 gendocs:
 	go run ./cmd/gendocs

@@ -8,53 +8,41 @@ FLOW="$(pwd)/flow"
 rm -rf /tmp/flow-demo /tmp/demo
 mkdir -p /tmp/demo "$FLOW_HOME/workspaces" "$FLOW_HOME/repos"
 
-# --- Create a fake claude binary that simulates an interactive agent session ---
+# --- Configure flow agent ---
+# A launcher script writes .claude/settings.json to pre-approve tools before
+# launching claude. This avoids permission dialogs during the demo.
 
-mkdir -p /tmp/flow-demo/bin
-cat > /tmp/flow-demo/bin/claude <<'SCRIPT'
+cat > /tmp/flow-demo/launch-claude.sh <<'LAUNCHER'
 #!/bin/bash
-DIM='\033[2m'
-CYAN='\033[36m'
-GREEN='\033[32m'
-BOLD='\033[1m'
-RESET='\033[0m'
+echo '{"permissions":{"allow":["Bash","Edit","Write","Read","Glob","Grep","Skill"]}}' > .claude/settings.json
+exec claude --model haiku
+LAUNCHER
+chmod +x /tmp/flow-demo/launch-claude.sh
 
-echo ""
-echo -e "  ${DIM}[mocked agent session]${RESET}"
-echo ""
-echo -e "  ${DIM}Flow includes skills that teach your agent to manage workspaces.${RESET}"
-echo -e "  ${DIM}Add your own skills for repo discovery, PR lookup, or any custom workflow.${RESET}"
-echo -e "  ${DIM}Paste a Slack thread, dictate a bug report — the agent handles the rest.${RESET}"
-echo ""
-echo -e "  ${BOLD}Enter your prompt:${RESET}"
-echo ""
-printf "  > "
-read -r task
+cat > "$FLOW_HOME/config.yaml" <<YAML
+apiVersion: flow/v1
+kind: Config
+spec:
+    agents:
+        - name: claude
+          exec: /tmp/flow-demo/launch-claude.sh
+          default: true
+YAML
 
-echo ""
-sleep 0.5
-echo -e "  ${CYAN}● Reading skill: flow-cli${RESET}"
-sleep 0.6
-echo -e "  ${CYAN}● Reading skill: find-repo${RESET}"
-echo -e "      ${DIM}→ github.com/acme/web${RESET}"
-sleep 0.6
-echo -e "  ${CYAN}● Editing state.yaml${RESET}"
-echo -e "      ${DIM}name: fix-dashboard-charts${RESET}"
-echo -e "      ${DIM}repo: github.com/acme/web @ fix/dashboard-charts${RESET}"
-sleep 0.6
-echo -e "  ${CYAN}● Running flow render...${RESET}"
-sleep 0.8
-echo ""
-echo -e "  ${GREEN}✓ Workspace ready${RESET}"
-echo ""
-echo -e "  ${CYAN}● Analyzing web/src/components/Charts.tsx...${RESET}"
-sleep 0.8
-echo ""
-printf "  > "
-read -r cmd
-echo ""
-SCRIPT
-chmod +x /tmp/flow-demo/bin/claude
+# --- Pre-trust the demo directory so Claude skips the workspace trust dialog ---
+
+CLAUDE_JSON="$HOME/.claude.json"
+if [ -f "$CLAUDE_JSON" ]; then
+  python3 -c "
+import json, sys
+with open('$CLAUDE_JSON') as f:
+    config = json.load(f)
+config.setdefault('projects', {})
+config['projects']['/tmp/flow-demo'] = {'hasTrustDialogAccepted': True}
+with open('$CLAUDE_JSON', 'w') as f:
+    json.dump(config, f, indent=2)
+"
+fi
 
 # --- Create local git repos with feature branches ---
 
@@ -67,29 +55,36 @@ create_repo() {
   echo "package main" > "$dir/main.go"
   git -C "$dir" add .
   git -C "$dir" commit -q -m "initial commit"
-  git -C "$dir" checkout -q -b "$branch"
+  git -C "$dir" checkout -q -b "$branch" 2>/dev/null || true
   echo "// $msg" >> "$dir/$file"
   git -C "$dir" add .
   git -C "$dir" commit -q -m "$msg"
 }
 
-create_repo "app"     "feature/ipv6"     "main.go"   "add ipv6 support"
-create_repo "api"     "feat/auth"        "main.go"   "add auth endpoints"
-create_repo "docs"    "update/guides"    "README.md" "update setup guide"
-create_repo "web"     "feat/dashboard"   "main.go"   "add dashboard page"
-create_repo "billing" "feat/billing-v2"  "main.go"   "billing v2 migration"
-create_repo "gateway" "feat/rate-limits" "main.go"   "add rate limiting"
-create_repo "config"  "feat/env-vars"    "main.go"   "add env var support"
+create_repo "app"            "feature/ipv6"     "main.go"   "add ipv6 support"
+create_repo "api"            "feat/auth"        "main.go"   "add auth endpoints"
+create_repo "docs"           "update/guides"    "README.md" "update setup guide"
+create_repo "web"            "feat/dashboard"   "main.go"   "add dashboard page"
+create_repo "billing"        "feat/billing-v2"  "main.go"   "billing v2 migration"
+create_repo "gateway"        "feat/rate-limits" "main.go"   "add rate limiting"
+create_repo "config"         "feat/env-vars"    "main.go"   "add env var support"
+create_repo "apps"           "main"             "main.go"   "initial app setup"
+create_repo "infrastructure" "main"             "main.go"   "initial infra setup"
 
 # --- Pre-populate bare clone cache for realistic URLs ---
 
-for name in app api docs web billing gateway config; do
+for name in app api docs web billing gateway config apps infrastructure; do
   bare="$FLOW_HOME/repos/github.com/acme/${name}.git"
   mkdir -p "$(dirname "$bare")"
   git clone --bare "/tmp/demo/$name" "$bare" -q
   # Add fetch refspec so worktrees can resolve origin/* refs
   git -C "$bare" config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
   git -C "$bare" fetch -q origin
+
+  # Also create under SSH URL path (in case Claude uses git@ format)
+  ssh_bare="$FLOW_HOME/repos/git@github.com:acme/${name}.git"
+  mkdir -p "$(dirname "$ssh_bare")"
+  cp -a "$bare" "$ssh_bare"
 done
 
 # --- Create and render pre-existing workspaces ---

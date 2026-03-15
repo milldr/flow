@@ -6,7 +6,17 @@ CLI for managing multi-repo development workspaces using git worktrees.
 
 Working across multiple repos means repetitive setup, scattered branches, and cleanup debt. Flow uses a YAML state file to define which repos and branches belong together, then materializes the workspace with bare clone caching and git worktrees.
 
-![flow demo](demo.gif)
+### Describe the problem, flow does the rest
+
+`flow init` creates a workspace pre-configured with agent instructions and skills, then launches you directly into your preferred agent — Claude, Cursor, or anything else you configure. The agent reads the embedded flow skill to understand how workspaces work, plus any custom skills you've added (like resolving repos by friendly names). Describe what you're working on and the agent handles the rest: editing the state file, rendering worktrees, and getting everything ready to go.
+
+![flow init](demo.gif)
+
+### Track all your workstreams in one place
+
+`flow status` gives you a live view across all active workspaces. Statuses are fully customizable — they're just one-line shell commands in a config file, not hardcoded logic. Have your AI generate complex status checks (query GitHub PRs, check CI, inspect git state) and hide them behind simple labels. Nothing in flow is opinionated; anything that could be is configurable.
+
+![flow status](demo-status.gif)
 
 ## Features
 
@@ -84,8 +94,7 @@ Flow stores everything under `~/.flow` (override with `$FLOW_HOME`):
 │   └── claude/
 │       ├── CLAUDE.md                   # Shared agent instructions
 │       └── skills/
-│           ├── flow-cli/SKILL.md       # Built-in: workspace management
-│           ├── workspace-structure/SKILL.md  # Built-in: directory layout
+│           ├── flow/SKILL.md           # Built-in: workspace management
 │           └── find-repo/SKILL.md      # Your own custom skill
 ├── workspaces/
 │   └── calm-delta/                     # Workspace ID
@@ -94,7 +103,7 @@ Flow stores everything under `~/.flow` (override with `$FLOW_HOME`):
 │       ├── CLAUDE.md                   # Generated workspace context
 │       ├── .claude/
 │       │   ├── CLAUDE.md → agents/claude/CLAUDE.md
-│       │   └── skills → agents/claude/skills/
+│       │   └── skills/                # Consolidated from shared + repo skills
 │       ├── vpc-service/                # Worktree
 │       └── subnet-manager/             # Worktree
 └── repos/
@@ -105,7 +114,7 @@ Flow stores everything under `~/.flow` (override with `$FLOW_HOME`):
 
 Bare clones are shared across workspaces. Worktrees are cheap — they share the object store with the bare clone, so multiple workspaces pointing at the same repo don't duplicate data.
 
-Flow ships two built-in skills (`flow-cli` and `workspace-structure`) and preserves any custom skills you add to the same directory. Run `flow reset skills` to update the built-in skills without touching your own.
+Flow ships a built-in `flow` skill and consolidates skills from all repos into each workspace's `.claude/skills/` directory on render. Add your own skills to the shared directory or to individual repos. Run `flow reset skills` to update the built-in skill without touching your own.
 
 See the [spec reference](docs/specs/) for YAML file schemas and the [command reference](docs/commands/) for usage, flags, and GIF demos.
 
