@@ -8,7 +8,7 @@ Flow manages multi-repo development workspaces using git worktrees. A YAML manif
 
 ## Getting Started
 
-If this is a fresh workspace with no repos yet, the user will give you a task — possibly pasted from Slack, dictated, or described in plain language. Use the **Task Initialization** section in the `flow-cli` skill to set the workspace name, description, add repos, render, and start working. You have everything you need to bootstrap the workspace yourself.
+If this is a fresh workspace with no repos yet, the user will give you a task — possibly pasted from Slack, dictated, or described in plain language. Use the **Task Initialization** section in the `flow` skill to set the workspace name, description, add repos, render, and start working. You have everything you need to bootstrap the workspace yourself.
 
 ## How this workspace is structured
 
@@ -21,5 +21,4 @@ Each workspace directory contains:
 ## Skills
 
 Refer to the skills in `.claude/skills/` for detailed information:
-- `flow-cli/SKILL.md` — common flow commands and state file format
-- `workspace-structure/SKILL.md` — workspace directory layout conventions
+- `flow/SKILL.md` — commands, state format, rendering, and PRs

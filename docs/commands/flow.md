@@ -26,5 +26,6 @@ A YAML manifest defines which repos/branches belong together, and `flow render` 
 * [flow render](flow_render.md)	 - Create worktrees from workspace state file
 * [flow reset](flow_reset.md)	 - Reset a config file to its default value
 * [flow status](flow_status.md)	 - Show workspace status
+* [flow sync](flow_sync.md)	 - Fetch and rebase worktrees onto their base branches
 * [flow version](flow_version.md)	 - Print the version
 

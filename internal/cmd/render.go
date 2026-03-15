@@ -15,7 +15,7 @@ func newRenderCmd(svc *workspace.Service) *cobra.Command {
 		Use:     "render <workspace>",
 		Short:   "Create worktrees from workspace state file",
 		Args:    cobra.ExactArgs(1),
-		Example: "  flow render calm-delta\n  flow render calm-delta --reset        # Reset existing branches\n  flow render calm-delta --reset=false   # Use existing branches",
+		Example: "  flow render calm-delta\n  flow render calm-delta --reset=false   # Use existing remote branches instead of creating fresh",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, st, err := resolveWorkspace(svc, args[0])
 			if err != nil {
@@ -25,15 +25,10 @@ func newRenderCmd(svc *workspace.Service) *cobra.Command {
 			name := workspaceDisplayName(id, st)
 
 			opts := &workspace.RenderOptions{}
-			if cmd.Flags().Changed("reset") {
-				if reset {
-					opts.OnBranchConflict = workspace.BranchConflictReset
-				} else {
-					opts.OnBranchConflict = workspace.BranchConflictUseExisting
-				}
+			if reset {
+				opts.OnBranchConflict = workspace.BranchConflictReset
 			} else {
-				opts.OnBranchConflict = workspace.BranchConflictPrompt
-				opts.PromptBranchConflict = ui.ConfirmBranchReset
+				opts.OnBranchConflict = workspace.BranchConflictUseExisting
 			}
 
 			err = ui.RunWithSpinner("Rendering workspace: "+name, func(report func(string)) error {
